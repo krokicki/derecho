@@ -1,5 +1,7 @@
 # [Derecho](http://github.com/krokicki/derecho) 
 
+![Derecho Screenshot](images/screenshots/derecho_0_sm.png)
+
 Derecho is a real-time, animated visualization of compute cluster activity, currently supporting Oracle Grid Engine clusters. Its primary goal is to demystify grid architecture and enable intuitive identification of grid usage patterns. It was created by Konrad Rokicki for the compute grid at HHMI's [Janelia Farm Research Campus](http://www.janelia.org/).
 
 ## How To Use It
