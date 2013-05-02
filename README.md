@@ -6,12 +6,12 @@ Derecho is a real-time, animated visualization of compute cluster activity, curr
 
 ## Features
 
-* [Jobs color-coded by user](images/screenshots/derecho_0.png)
-* [Browse historical data, or view "live" status](images/screenshots/derecho_1.png)
-* [Animated job scheduling](images/screenshots/derecho_2.png)
-* [Graph showing number of jobs over time](images/screenshots/derecho_3.png)
-* [Single user black-out mode](images/screenshots/derecho_4.png)
-* [Node usage heatmap](images/screenshots/derecho_5.png)
+* [Jobs color-coded by user](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_0.png)
+* [Browse historical data, or view "live" status](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_1.png)
+* [Animated job scheduling](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_2.png)
+* [Graph showing number of jobs over time](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_3.png)
+* [Single user black-out mode](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_4.png)
+* [Node usage heatmap](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_5.png)
 
 ## How To Use It
 
