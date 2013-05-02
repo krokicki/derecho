@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project name="Derecho" default="dist">
+        
+    <property name="src.dir" value="${basedir}/src" />
+    <property name="data.dir" value="${basedir}/src/data" />
+    <property name="lib.dir" value="${basedir}/lib" />
+    <property name="build.dir" value="${basedir}/build" />
+    <property name="build.classes.dir" value="${build.dir}/classes" />
+    <property name="build.jars.dir" value="${build.dir}/jars" />
+    <property name="run.script" value="${basedir}/scripts/run.sh" />
+    
+    <property name="build.jar" value="${build.jars.dir}/derecho_app.jar" />
+    <property name="build.jar.lib.dir" value="${build.jars.dir}/derecho_lib" />
+
+    <property name="final.dir" value="${build.dir}/Derecho" />
+    <property name="final.jar" value="${final.dir}/derecho.jar" />
+    <property name="final.lib.dir" value="${final.dir}/derecho_lib" />
+    <property name="final.script" value="${final.dir}/derecho.sh" />
+    
+    <path id="compile.classpath">
+        <fileset dir="${lib.dir}" includes="**/*.jar" />
+    </path>
+
+    <target name="compile">
+
+        <delete dir="${build.dir}" />
+        <mkdir dir="${build.dir}" />
+
+        <delete dir="${build.classes.dir}" />
+        <mkdir dir="${build.classes.dir}" />
+
+        <javac srcdir="${src.dir}" destdir="${build.classes.dir}">
+            <classpath refid="compile.classpath" />
+            <include name="**/*.java" />
+        </javac>
+        
+    </target>
+
+    <target name="build-jar" depends="compile">
+
+        <delete dir="${build.jar.lib.dir}" />
+        <mkdir dir="${build.jar.lib.dir}" />
+
+        <copy todir="${build.jar.lib.dir}" flatten="true">
+            <path>
+                <path refid="compile.classpath" />
+            </path>
+        </copy>
+
+        <copydir src="${data.dir}" dest="${build.classes.dir}/data"/>
+        
+        <path id="jar.classpath">
+            <fileset dir="${build.jar.lib.dir}" includes="**/*.jar" />
+        </path>
+
+        <manifestclasspath property="manifest.classpath" jarfile="${build.jar}">
+            <classpath refid="jar.classpath" />
+        </manifestclasspath>
+
+        <copy file="${src.dir}/logback-prod.xml" tofile="${build.classes.dir}/logback.xml"/>
+                    
+        <jar destfile="${build.jar}">
+            <manifest>
+                <attribute name="Main-Class" value="gui.GridSketch" />
+                <attribute name="Class-Path" value="${manifest.classpath}" />
+            </manifest>
+            <fileset dir="${build.classes.dir}" />
+        </jar>
+
+    </target>
+
+    <target name="dist" depends="build-jar">
+
+        <delete dir="${final.dir}" />
+        <mkdir dir="${final.dir}" />
+
+        <move file="${build.jar}" tofile="${final.jar}"/>
+        <move file="${build.jar.lib.dir}" tofile="${final.lib.dir}"/>
+
+        <copy todir="${final.dir}" flatten="true">
+            <fileset dir="${basedir}">
+                <include name="*.properties" />
+            </fileset>
+        </copy>
+
+        <copy file="${run.script}" tofile="${final.script}"/>
+        <chmod file="${final.script}" perm="ugo+x"/>
+        
+    </target>
+    
+</project>
