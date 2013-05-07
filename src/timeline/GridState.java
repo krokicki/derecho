@@ -154,7 +154,7 @@ public class GridState {
                 aids.put(node,aid);
             }
             else {
-                throw new IllegalStateException("Grid node with invalid name: " +node.getShortName());
+                log.warn("Ignoring grid node with invalid name: " +node.getShortName());
             }
         }
         
@@ -163,6 +163,7 @@ public class GridState {
         grid = new GridNode[gridWidth][gridHeight];
 
         for(GridNode node : nodes) {
+        	if (!fids.containsKey(node)) continue;
             int fid = fids.get(node);
             int uid = uids.get(node);
             String aid = aids.get(node);
