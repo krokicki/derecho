@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
+import javax.swing.JOptionPane;
+
 import org.perf4j.LoggingStopWatch;
 import org.perf4j.StopWatch;
 import org.slf4j.Logger;
@@ -37,6 +39,7 @@ public class GridSketch extends PApplet {
 
     private static final String MAIN_CLASS = "gui.GridSketch";
     private static final long LIVE_POLL_INTERVAL_SECONDS = ConfigProperties.getInteger("derecho.data.poll.secs",5);
+    private static final int MAX_DRAWING_ERRORS = 5;
     
     private final boolean TIMER = false;
     private final boolean bufferAllBeforePlaying = true; 
@@ -70,6 +73,8 @@ public class GridSketch extends PApplet {
     private long lastPositionTime = 0;
     private boolean sliderWasPressedLastFrame = false;
 
+    private int errorsWhileDrawing = 0;
+    
     private List<String> users;
     private int currUserIndex = 0;
     private Long lastChange = 0L;
@@ -375,6 +380,13 @@ public class GridSketch extends PApplet {
         }
         catch (Exception e) {
             log.error("Error while drawing",e);
+        	if (errorsWhileDrawing++>MAX_DRAWING_ERRORS) {
+        		JOptionPane.showMessageDialog(frame,
+        			    "Error encountered. See error log for details.",
+        			    "Fatal error",
+        			    JOptionPane.ERROR_MESSAGE);
+        		System.exit(1);
+        	}
         }
     }
 
