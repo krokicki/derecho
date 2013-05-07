@@ -24,7 +24,7 @@ public abstract class Sprite implements Drawable {
     protected float opacity = 255;
     protected  Set<Motion> tweens = new HashSet<Motion>();
 
-    Sprite(PVector pos) {
+    public Sprite(PVector pos) {
         this.pos = new PVector(pos.x, pos.y);
     }
 

@@ -33,7 +33,7 @@ public class LineGraph implements Drawable {
     private int maxValue;
     private int color = Utils.color("FF0000");
     
-    LineGraph(Rectangle rect, Timeline timeline, Map<Long, Integer> graphMap) {
+    public LineGraph(Rectangle rect, Timeline timeline, Map<Long, Integer> graphMap) {
         this.rect = rect;
         this.timeline = timeline;
         this.graphMap = graphMap;

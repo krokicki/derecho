@@ -51,17 +51,17 @@ public class SketchState implements Runnable {
     private static final int HEATMAP_MAX_HUE = 250;
     
     public class ColorScheme {
-        int gridBackgroundColor;
-        int gridBaseColor;
-        int nodeBorderColor;
-        int nodeBackgroundColor;
-        int emptySlotColor;
-        int timelineColor;
-        int panelBorderColor;
-        int graphLineColorRunningJobs;
-        int graphLineColorQueuedJobs;
-        int nodeFontColor;
-        int titleFontColor;
+        public int gridBackgroundColor;
+        public int gridBaseColor;
+        public int nodeBorderColor;
+        public int nodeBackgroundColor;
+        public int emptySlotColor;
+        public int timelineColor;
+        public int panelBorderColor;
+        public int graphLineColorRunningJobs;
+        public int graphLineColorQueuedJobs;
+        public int nodeFontColor;
+        public int titleFontColor;
     }
 
     public class DefaultColorScheme extends ColorScheme {

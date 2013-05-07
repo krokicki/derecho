@@ -11,21 +11,21 @@ import processing.core.PVector;
  */
 public class Rectangle {
 
-    class Bounds {
-        float minX, minY, maxX, maxY;
+    public class Bounds {
+        public float minX, minY, maxX, maxY;
 
-        Bounds(float x1, float y1, float x2, float y2) {
+        public Bounds(float x1, float y1, float x2, float y2) {
             minX = x1;
             minY = y1;
             maxX = x2;
             maxY = y2;
         }
 
-        boolean contains(float x, float y) {
+        public boolean contains(float x, float y) {
             return (x >= minX && x <= maxX && y >= minY && y <= maxY);
         }
 
-        boolean collidesWith(Bounds otherBounds) {
+        public boolean collidesWith(Bounds otherBounds) {
             if (maxY < otherBounds.minY)
                 return false;
             if (minY > otherBounds.maxY)
@@ -39,7 +39,7 @@ public class Rectangle {
             return true;
         }
 
-        void constrain(PVector pos) {
+        public void constrain(PVector pos) {
             pos.x = PApplet.constrain(pos.x, minX, maxX);
             pos.y = PApplet.constrain(pos.y, minY, maxY);
         }
