@@ -17,5 +17,6 @@
 	<classpathentry kind="lib" path="lib/processing/jogl-all.jar"/>
 	<classpathentry kind="lib" path="lib/general/guava-14.0.1.jar"/>
 	<classpathentry kind="lib" path="lib/general/joda-time-2.2.jar"/>
+	<classpathentry kind="lib" path="lib/libraries/peasycam.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
