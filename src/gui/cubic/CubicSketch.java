@@ -1,5 +1,6 @@
 package gui.cubic;
 
+import gui.GridConfig;
 import gui.GridSketch;
 import gui.Rectangle;
 import gui.cubic.CubicSketchState.JobActor;
@@ -45,9 +46,6 @@ public class CubicSketch extends PApplet {
     private final boolean bufferAllBeforePlaying = true; 
     private final boolean startAtLivePosition = false;
 
-    
-    private String title = ConfigProperties.getString("derecho.viz.title","Derecho Compute Cluster Visualization");
-    
     private int sliderColor = color("232847");
     private int sliderBarColor = color("323966");
     private int sliderBarActiveColor = color("323966");
@@ -120,7 +118,6 @@ public class CubicSketch extends PApplet {
         frameRate(60);
         lights();
 
-        
         cam = new PeasyCam(this, 0, 0, 0, 800);
         cam.setMinimumDistance(minZoom);
         cam.setMaximumDistance(maxZoom);
@@ -129,6 +126,10 @@ public class CubicSketch extends PApplet {
             this.appWidth = displayWidth;
             this.appHeight = displayHeight;
 
+            // Ensure we can load configurations 
+            GridConfig.getInstance();
+            ConfigProperties.getInstance();
+            
             Motion.setup(this);
             
             cp5 = new ControlP5(this);
@@ -148,9 +149,9 @@ public class CubicSketch extends PApplet {
             float progressSliderX = (displayWidth - progressSliderWidth)/2;
             float progressSliderY = (displayHeight - progressSliderHeight)/2;
 
-            float sliderPadding = displayHeight * .02f;
+            float sliderPadding = displayHeight * .01f;
             
-            sliderRect = new Rectangle(sliderPadding, height-sliderPadding*2, width-sliderPadding*2, displayHeight * .03f);
+            sliderRect = new Rectangle(sliderPadding, height-sliderPadding*2, width-sliderPadding*2, displayHeight * .01f);
             
             cp5.addSlider("progress")
                 .setPosition(progressSliderX, progressSliderY)
@@ -259,13 +260,6 @@ public class CubicSketch extends PApplet {
     public void draw() {
         try {
             background(0);
-
-//            rotateX(-.5f);
-//            rotateY(-.5f);
-//            pushMatrix();
-//            fill(255,0,0);
-//            box(30);
-//            popMatrix();
             
             StopWatch stopWatch = null;
             if (TIMER) stopWatch = new LoggingStopWatch("draw");
@@ -446,7 +440,7 @@ public class CubicSketch extends PApplet {
         }
         
         this.timeline = new Timeline();
-        this.sketchState = new CubicSketchState(this, timeline, appWidth, appHeight, title);
+        this.sketchState = new CubicSketchState(this, timeline, appWidth, appHeight);
         
         // Reset the play speed
 //        this.playSpeed = 1.0f;

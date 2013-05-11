@@ -1,8 +1,10 @@
 # [Derecho](http://github.com/krokicki/derecho) 
 
-![Derecho Screenshot](images/screenshots/derecho_0_sm.png)
+![Derecho Screenshot](https://raw.github.com/krokicki/derecho/master/images/screenshots/derecho_0_sm.png)
 
-Derecho is a real-time, animated visualization of compute cluster activity, currently supporting Oracle Grid Engine clusters. Its primary goal is to demystify grid architecture and enable intuitive identification of grid usage patterns. It was created by Konrad Rokicki for the compute grid at HHMI's [Janelia Farm Research Campus](http://www.janelia.org/).
+Derecho is a real-time, animated visualization of compute cluster activity, currently supporting Oracle Grid Engine clusters. 
+Its primary goal is to demystify grid architecture and enable intuitive identification of grid usage patterns. 
+It was created by Konrad Rokicki for the compute grid at HHMI's [Janelia Farm Research Campus](http://www.janelia.org/).
 
 ## Features
 
@@ -15,14 +17,17 @@ Derecho is a real-time, animated visualization of compute cluster activity, curr
 
 ## How To Use It
 
-This visualization client is currently set up to work within the confines of certain conventions in use at the JFRC. My goal is to make this tool as configurable as possible, but at this point if you would like to use it on your own grid, some code changes are probably inevitable. Please consider contributing your code back to the project!
+This visualization client is currently only known to work within the confines of certain conventions in use at the JFRC. 
+My goal is to make this tool as configurable as possible, but at this point if you would like to use it on your own grid, 
+some code minor changes are probably inevitable. Please consider contributing your code back to the project.
 
 ## Getting Started
 
 1. Create a MySQL database with the schema in the sql directory, and create a recurring job to populate it with the results of qstat or similar job status tool.
 2. Copy ./src/derecho.properties to ./app.properties and customize it to point to the configured MySQL database.
-3. Run ant with the default build target to generate a distribution directory under ./build/Derecho
-4. (optional) use Jar Bundler to create a app bundle for distribution to OS X systems
+3. Modify ./conf/grid_config to subset your grid nodes and define the number of slots for each node 
+4. Run ant with the default build target to generate a distribution directory under ./build/Derecho
+5. (optional) use Jar Bundler to create a app bundle for distribution to OS X systems
 
 ## Copyright and License
 

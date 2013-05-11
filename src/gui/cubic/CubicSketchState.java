@@ -64,7 +64,6 @@ public class CubicSketchState implements Runnable {
     
     // Overall state
     private Legend legend;
-    private String title;
     private Timeline timeline;
     
     // State for playing
@@ -79,9 +78,8 @@ public class CubicSketchState implements Runnable {
     private boolean tweenChanges = true;
     
     
-    public CubicSketchState(PApplet p, Timeline timeline, float width, float height, String title) {
+    public CubicSketchState(PApplet p, Timeline timeline, float width, float height) {
         this.p = p;
-        this.title = title;
         this.width = width;
         this.height = height;
         this.timeline = timeline;

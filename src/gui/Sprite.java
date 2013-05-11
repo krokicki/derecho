@@ -32,26 +32,28 @@ public abstract class Sprite implements Drawable {
         if (countdown>0) countdown--;
         if (isInMotion()) {
             Set<Motion> toRemove = new HashSet<Motion>();
-            for(Motion m : tweens) {
-                if (!m.isPlaying()) {
-                    if (m.getPosition()==0) {
-                        m.play();
-                    }
-                    else {
-                        toRemove.add(m);    
-                    }
-                }
-                else {
-                    m.update();
-                }
+            synchronized (tweens) {
+	            for(Motion m : tweens) {
+	                if (!m.isPlaying()) {
+	                    if (m.getPosition()==0) {
+	                        m.play();
+	                    }
+	                    else {
+	                        toRemove.add(m);    
+	                    }
+	                }
+	                else {
+	                    m.update();
+	                }
+	            }
+	            for (Motion m : toRemove) {
+	                tweens.remove(m);
+	                if (!isInMotion()) {
+	                    // This sprite just stopped, start the Schrodinger countdown during which it appears both static and in motion
+	                    countdown=30;
+	                }
+	            }       
             }
-            for (Motion m : toRemove) {
-                tweens.remove(m);
-                if (!isInMotion()) {
-                    // This sprite just stopped, start the Schrodinger countdown during which it appears both static and in motion
-                    countdown=30;
-                }
-            }       
         }
     }
     
@@ -106,6 +108,8 @@ public abstract class Sprite implements Drawable {
     }
 
     public Set<Motion> getTweens() {
-        return tweens;
+    	synchronized (tweens) {
+    		return tweens;
+    	}
     }
 }
