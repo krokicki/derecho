@@ -567,8 +567,9 @@ public class CubicSketchState implements Runnable {
         int i = 0;
         GridJob[] nodeJobs = job.getNode().getSlots();
         for(int s=0; s<nodeJobs.length; s++) {
-            if (nodeJobs[s]==null) continue;
-            if (!nodeJobs[s].getFullJobId().equals(fullJobId)) continue;
+        	GridJob nodeJob = nodeJobs[s];
+            if (nodeJob==null) continue;
+            if (!nodeJob.getFullJobId().equals(fullJobId)) continue;
             
             if (i>0) {
                 jobActor = cloneJobActor(fullJobId);

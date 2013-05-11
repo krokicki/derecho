@@ -115,6 +115,8 @@ public class Legend implements Drawable {
     
     public void draw(PGraphics buf) {
         
+    	if (rect==null) return;
+    	
         buf.beginDraw();
         buf.textFont(font);
         buf.textAlign(PApplet.TOP, PApplet.TOP);

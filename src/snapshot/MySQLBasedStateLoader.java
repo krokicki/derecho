@@ -47,17 +47,13 @@ public class MySQLBasedStateLoader extends StateLoader {
     public boolean loadInitial() throws Exception {
         log.info("Loading {} initial hours",initialHours);
         return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time >= convert_tz(now(), @@global.time_zone, 'US/Eastern') - INTERVAL "+initialHours+" HOUR order by poll_date_time");
-//      return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/04/15 09:00:00' and '2013/04/15 17:00:00' order by poll_date_time"); // demo 1
+//      return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/05/07 13:00:00' and '2013/05/07 13:30:00' order by poll_date_time"); // new grid
+//      return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/05/07 09:00:00' and '2013/05/07 9:05:00' order by poll_date_time"); // demo 1
 //      return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/04/16 11:00:00' and '2013/04/16 19:30:00' order by poll_date_time"); // demo 2
-        
+//        return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/04/25 12:00:00' and '2013/04/25 12:20:00' order by poll_date_time"); // cubic demo 1
 //        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time >= now() - INTERVAL 30 MINUTE order by poll_date_time");
 //        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time >= now() - INTERVAL 6 HOUR order by poll_date_time");
 //        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2012/12/20' and '2012/12/21' order by poll_date_time");
-//        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/03/08 16:00:00' and '2013/03/08 18:00:00' order by poll_date_time");
-//        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/03/10 01:00:00' and '2013/03/10 03:00:00' order by poll_date_time");
-//        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/01/31 17:15:00' and '2013/01/31 17:30:00' order by poll_date_time");
-//        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/01/31 16:40:00' and '2013/01/31 18:13:00' order by poll_date_time"); // test queue sizing (smaller)
-//        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/01/31 18:05:00' and '2013/01/31 20:10:00' order by poll_date_time"); // for testing queue sizing
 //      loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/02/08 22:00:00' and '2013/02/08 23:00:00' order by poll_date_time"); // for out of slot fix
     }
     

@@ -1,16 +1,9 @@
 package timeline;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import gui.GridConfig;
+import gui.GridConfig.NodeConfiguration;
+
+import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,15 +21,9 @@ public class GridState {
     
     private static final Logger log = LoggerFactory.getLogger(GridState.class);
     
-    public static final int SLOTS_PER_NODE = 8;
-    
     private String name;
     private List<GridNode> nodes = new ArrayList<GridNode>();
     private List<GridJob> queuedJobs = new ArrayList<GridJob>();
-
-    private int gridWidth = 0;
-    private int gridHeight = 0;
-    private GridNode[][] grid;
     
     private Map<String,GridNode> nodeMap = new HashMap<String,GridNode>();
     private Map<String,GridJob> jobMap = new HashMap<String,GridJob>();
@@ -46,9 +33,15 @@ public class GridState {
     public GridState(Snapshot snapshot, String name) {
 
         this.name = name;
-        
+
+    	GridConfig config = GridConfig.getInstance();
+    	
         for(SnapshotNode ssNode : snapshot.getNodes()) {
-            GridNode node = new GridNode(ssNode.getShortName());
+        	
+    		NodeConfiguration nodeConfig = config.getConfiguration(ssNode.getShortName());
+    		int numSlots = nodeConfig.getNodeSet().getSlots();
+        	
+            GridNode node = new GridNode(ssNode.getShortName(), numSlots);
             nodes.add(node);
             for(SnapshotJob ssJob : ssNode.getJobs()) {
                 GridJob job = new GridJob(ssJob);
@@ -74,14 +67,6 @@ public class GridState {
 
     public int getNumQueuedJobs() {
         return queuedJobs.size();
-    }
-
-    public int getNumCols() {
-        return gridWidth;
-    }
-
-    public int getNumRows() {
-        return gridHeight;
     }
     
     public void removeJob(GridJob job) {
@@ -113,10 +98,6 @@ public class GridState {
         return jobMap.get(fullJobId);
     }
     
-    public GridNode[][] getGrid() {
-        return grid;
-    }
-
     public Map<String, GridNode> getNodeMap() {
         return nodeMap;
     }
@@ -134,84 +115,27 @@ public class GridState {
     }
 
     public void init() {
-        
-        Map<GridNode,Integer> fids = new HashMap<GridNode,Integer>();
-        Map<GridNode,Integer> uids = new HashMap<GridNode,Integer>();
-        Map<GridNode,String> aids = new HashMap<GridNode,String>();
-        
+                
         for(GridNode node : nodes) {
-            Pattern p = Pattern.compile("^f0*(\\d+?)u0*(\\d+)([a-z])?");
-            Matcher m = p.matcher(node.getShortName());
-            if (m.matches()) {
-                int fid = Integer.parseInt(m.group(1));
-                int uid = Integer.parseInt(m.group(2));
-                String aid = m.group(3);
-                log.trace("fid="+fid+", uid="+uid+" aid="+aid);
-                if (fid>gridHeight) gridHeight = fid;
-                if (uid>gridWidth) gridWidth = uid;
-                fids.put(node,fid);
-                uids.put(node,uid);
-                aids.put(node,aid);
-            }
-            else {
-                log.warn("Ignoring grid node with invalid name: " +node.getShortName());
-            }
-        }
-        
-        gridHeight+=1;
-        
-        grid = new GridNode[gridWidth][gridHeight];
-
-        for(GridNode node : nodes) {
-        	if (!fids.containsKey(node)) continue;
-            int fid = fids.get(node);
-            int uid = uids.get(node);
-            String aid = aids.get(node);
-            
-            if (fid==15) {
-                if (uid==4) {
-                    if ("a".equals(aid)) {
-                        // Do nothing
-                    }
-                    else if ("b".equals(aid)) {
-                        uid=5;
-                    }
-                }
-                else if (uid==5) {
-                    if ("a".equals(aid)) {
-                        uid=6;
-                    }
-                    else if ("b".equals(aid)) {
-                        uid=7;
-                    }
-                }
-            }
-            
-            if (grid[uid-1][fid]!=null) {
-                continue;
-            }
-            grid[uid-1][fid] = node;
             nodeMap.put(node.getShortName(),node);
-            
             for(GridJob job : node.getSlots()) {
                 if (job==null) continue;
                 String user = job.getOwner();
                 incrementSlots(user, job.getSlots());
             }
-            
-            Collections.sort(users, new Comparator<String>() {
-                @Override
-                public int compare(String user1, String user2) {
-                    Integer slots1 = slotsUsedByUser.get(user1);
-                    Integer slots2 = slotsUsedByUser.get(user2);
-                    if (slots1==null && slots2 == null) return 0;
-                    if (slots1==null) return -1;
-                    if (slots2==null) return 1;
-                    return slots2.compareTo(slots1);
-                }
-                
-            });
         }
+        
+        Collections.sort(users, new Comparator<String>() {
+            @Override
+            public int compare(String user1, String user2) {
+                Integer slots1 = slotsUsedByUser.get(user1);
+                Integer slots2 = slotsUsedByUser.get(user2);
+                if (slots1==null && slots2 == null) return 0;
+                if (slots1==null) return -1;
+                if (slots2==null) return 1;
+                return slots2.compareTo(slots1);
+            }
+        });
     }
     
     private void incrementSlots(String user, int slots) {
@@ -317,64 +241,64 @@ public class GridState {
         }
     }   
     
-    public void printGridSummary() {
-        StringBuilder sb = new StringBuilder();
-        for(int j=0; j<gridWidth; j++) {
-            sb.append("\tu"+(j+1)); 
-        }
-        log.info(sb.toString());
-        sb = new StringBuilder();
-        for(int i=0; i<gridHeight; i++) {
-            sb.append("f"+i+"\t");
-            for(int j=0; j<gridWidth; j++) {
-                GridNode node = grid[j][i];
-                if (node==null) {
-                    sb.append("-\t");   
-                }
-                else {
-                    int totalSlots = 0;
-                    for(GridJob job : node.getSlots()) {
-                        if (job==null) continue;
-                        totalSlots += job.getSlots();
-                    }
-                    sb.append(totalSlots+"\t");
-                }
-            }
-            log.info(sb.toString());
-        }
-        
-        log.info("\nSlots per user:");
-        for(String user : users) {
-            Integer slots = slotsUsedByUser.get(user);
-            log.info(slots+"\t"+user);
-        }
-    }
-    
-    public void printGridState() {
-        log.info(""+name+" Grid State");
-        for(int i=0; i<gridHeight; i++) {
-            for(int j=0; j<gridWidth; j++) {
-                GridNode node = grid[j][i];
-                if (node!=null) {
-                    log.info(node.getShortName());
-                    int s = 0;
-                    for(GridJob job : node.getSlots()) {
-                        if (job==null) {
-                            log.info("    Slot "+s+": empty");  
-                        }
-                        else {
-                            log.info("    Slot "+s+":"+job.getFullJobId()+", "+job.getOwner()+" ("+job.getState()+")");
-                        }
-                        s++;
-                    }
-                }
-            }
-        }
-        log.info("Queued:");
-        for(GridJob job : queuedJobs) {
-            log.info("    "+job.getFullJobId()+", "+job.getOwner()+" ("+job.getState()+")");
-        }
-    }
+//    public void printGridSummary() {
+//        StringBuilder sb = new StringBuilder();
+//        for(int j=0; j<gridWidth; j++) {
+//            sb.append("\tu"+(j+1)); 
+//        }
+//        log.info(sb.toString());
+//        sb = new StringBuilder();
+//        for(int i=0; i<gridHeight; i++) {
+//            sb.append("f"+i+"\t");
+//            for(int j=0; j<gridWidth; j++) {
+//                GridNode node = grid[j][i];
+//                if (node==null) {
+//                    sb.append("-\t");   
+//                }
+//                else {
+//                    int totalSlots = 0;
+//                    for(GridJob job : node.getSlots()) {
+//                        if (job==null) continue;
+//                        totalSlots += job.getSlots();
+//                    }
+//                    sb.append(totalSlots+"\t");
+//                }
+//            }
+//            log.info(sb.toString());
+//        }
+//        
+//        log.info("\nSlots per user:");
+//        for(String user : users) {
+//            Integer slots = slotsUsedByUser.get(user);
+//            log.info(slots+"\t"+user);
+//        }
+//    }
+//    
+//    public void printGridState() {
+//        log.info(""+name+" Grid State");
+//        for(int i=0; i<gridHeight; i++) {
+//            for(int j=0; j<gridWidth; j++) {
+//                GridNode node = grid[j][i];
+//                if (node!=null) {
+//                    log.info(node.getShortName());
+//                    int s = 0;
+//                    for(GridJob job : node.getSlots()) {
+//                        if (job==null) {
+//                            log.info("    Slot "+s+": empty");  
+//                        }
+//                        else {
+//                            log.info("    Slot "+s+":"+job.getFullJobId()+", "+job.getOwner()+" ("+job.getState()+")");
+//                        }
+//                        s++;
+//                    }
+//                }
+//            }
+//        }
+//        log.info("Queued:");
+//        for(GridJob job : queuedJobs) {
+//            log.info("    "+job.getFullJobId()+", "+job.getOwner()+" ("+job.getState()+")");
+//        }
+//    }
     
     public void printDifferences(GridState otherState) {
         

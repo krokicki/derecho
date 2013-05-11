@@ -1,8 +1,11 @@
 package gui;
 
 import gui.SketchState.ColorScheme;
+import gui.SketchState.GridNodeArray;
+import gui.SketchState.JobSprite;
 import ijeoma.motion.Motion;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -45,8 +48,6 @@ public class GridSketch extends PApplet {
     private final boolean bufferAllBeforePlaying = true; 
     private final boolean startAtLivePosition = true;
 
-    private String title = ConfigProperties.getString("derecho.viz.title","Derecho Compute Cluster Visualization");
-    
     private int sliderColor = color("232847");
     private int sliderBarColor = color("323966");
     private int sliderBarActiveColor = color("323966");
@@ -77,7 +78,10 @@ public class GridSketch extends PApplet {
     
     private List<String> users;
     private int currUserIndex = 0;
-    private Long lastChange = 0L;
+    private Long lastUserChange = 0L;
+    
+    private List<String> subsets;
+    private int currSubsetIndex = 0;
     
     // Data model
     private Timeline timeline;
@@ -112,6 +116,10 @@ public class GridSketch extends PApplet {
             this.appWidth = displayWidth;
             this.appHeight = displayHeight;
 
+            // Ensure we can load configurations 
+            GridConfig.getInstance();
+            ConfigProperties.getInstance();
+            
             Motion.setup(this);
             
             cp5 = new ControlP5(this);
@@ -229,8 +237,8 @@ public class GridSketch extends PApplet {
             
             log.info("setup() complete");
         }
-        catch (Exception e) {
-            log.error("Error loading state",e);
+        catch (Throwable e) {
+            log.error("Initialization error",e);
             exit();
         }
     }
@@ -348,11 +356,15 @@ public class GridSketch extends PApplet {
                 if (TIMER) stopWatch.lap("drawGraphs");
 
                 // Draw moving sprites 
+                GridNodeArray currSubset = sketchState.getCurrentSubset();
                 if (!sketchState.isHeatmap()) {
-                    Iterator<? extends Sprite> i = sketchState.getJobSprites().values().iterator();
+                    Iterator<JobSprite> i = sketchState.getJobSprites().values().iterator();
                     while (i.hasNext()) {
-                        Sprite sprite = i.next();
+                    	JobSprite sprite = i.next();
                         if (!sprite.isInMotion()) continue;
+                        if (sprite.getSlotSprite()==null) continue;
+                        if (sprite.getSlotSprite().getNodeSprite()==null) continue;
+                        if (!currSubset.nodeSpriteInSubset(sprite.getSlotSprite().getNodeSprite())) continue;
                         sprite.draw(g);
                         // Do not animate anything while the slider is pressed
                         if (!sliderPressed) {
@@ -365,16 +377,15 @@ public class GridSketch extends PApplet {
                 
                 // Update slideshow state, if any
                 if (users!=null) {
-                    if (lastChange!=null && System.currentTimeMillis()-lastChange>2000) {
+                    if (lastUserChange!=null && System.currentTimeMillis()-lastUserChange>2000) {
                         if (++currUserIndex>=users.size()) {
                             currUserIndex = 0;
                         }
                         sketchState.setBwMode(true, users.get(currUserIndex));  
-                        lastChange = System.currentTimeMillis();
+                        lastUserChange = System.currentTimeMillis();
                     }
                 }
             }
-            
             
             if (TIMER) stopWatch.stop("draw");
         }
@@ -392,10 +403,20 @@ public class GridSketch extends PApplet {
 
     public void keyReleased() {
         if (keyCode == RIGHT) {
-            nextUser(true);
+        	if (users!=null) {
+        		nextUser(true);
+        	}
+        	else {
+        		nextSubset(true);
+        	}
         }
         else if (keyCode == LEFT) {
-            nextUser(false);
+        	if (users!=null) {
+        		nextUser(false);
+        	}
+        	else {
+        		nextSubset(false);
+        	}
         }
     }
     
@@ -412,7 +433,7 @@ public class GridSketch extends PApplet {
                 currUserIndex=users.size()-1;
             }
             
-            this.lastChange = System.currentTimeMillis();
+            this.lastUserChange = System.currentTimeMillis();
             currUser = users.get(currUserIndex);
             if (sketchState.getColorForUser(currUser)==null) {
                 currUser = null;
@@ -421,7 +442,25 @@ public class GridSketch extends PApplet {
                 sketchState.setBwMode(true, currUser);
             }
         }
-        lastChange = null;
+        lastUserChange = null;
+    }
+    
+    private void nextSubset(boolean increment) {
+        if (subsets==null) {
+        	this.subsets = new ArrayList<String>(sketchState.getSubsetNames());
+        }
+        String currSubset = null;
+        while (currSubset==null) {
+            currSubsetIndex += increment?1:-1;
+            if (currSubsetIndex>=subsets.size()) {
+            	currSubsetIndex=0;
+            }
+            else if (currSubsetIndex<0) {
+            	currSubsetIndex=subsets.size()-1;
+            }
+            currSubset = subsets.get(currSubsetIndex);
+        }
+        sketchState.setCurrentSubsetName(currSubset);
     }
 
     private void updateProgressBar() {
@@ -439,7 +478,7 @@ public class GridSketch extends PApplet {
         if (highlighUsers) {
             if (users!=null) return;
             this.users = sketchState.getUsers();
-            this.lastChange = System.currentTimeMillis();
+            this.lastUserChange = System.currentTimeMillis();
             this.currUserIndex = 0;
             sketchState.setBwMode(true, users.get(currUserIndex));
         }
@@ -518,7 +557,7 @@ public class GridSketch extends PApplet {
         }
         
         this.timeline = new Timeline();
-        this.sketchState = new SketchState(this, timeline, appWidth, appHeight, title);
+        this.sketchState = new SketchState(this, timeline, appWidth, appHeight);
         
         // Reset the play speed
         this.playSpeed = 1.0f;
@@ -571,7 +610,9 @@ public class GridSketch extends PApplet {
             public void onFailure(Throwable thrown) {
                 futureTimeline = null;
                 log.error("Error loading initial timeline",thrown);
-                System.err.println("Error connecting to database. Make sure that your database properties are correctly configured and specified with -DCONFIG=your.properties");
+                System.err.println("Error connecting to database. Make sure that your database properties are " +
+                		"correctly configured and specified with -DAPP_CONFIG=your.properties, and your grid " +
+                		"configuration specified with -DGRID_CONFIG=your_config.xml");
                 System.exit(1);
             }
         });     

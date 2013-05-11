@@ -4,11 +4,12 @@
     <property name="src.dir" value="${basedir}/src" />
     <property name="data.dir" value="${basedir}/src/data" />
     <property name="lib.dir" value="${basedir}/lib" />
+	<property name="conf.dir" value="${basedir}/conf" />
     <property name="build.dir" value="${basedir}/build" />
-    <property name="build.classes.dir" value="${build.dir}/classes" />
+	<property name="build.classes.dir" value="${build.dir}/classes" />
     <property name="build.jars.dir" value="${build.dir}/jars" />
     <property name="run.script" value="${basedir}/scripts/run.sh" />
-    
+	
     <property name="build.jar" value="${build.jars.dir}/derecho_app.jar" />
     <property name="build.jar.lib.dir" value="${build.jars.dir}/derecho_lib" />
 
@@ -80,6 +81,9 @@
         <copy todir="${final.dir}" flatten="true">
             <fileset dir="${basedir}">
                 <include name="*.properties" />
+            </fileset>
+            <fileset dir="${conf.dir}">
+                <include name="*" />
             </fileset>
         </copy>
 

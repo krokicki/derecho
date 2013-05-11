@@ -41,6 +41,7 @@ public class SummaryView implements Drawable {
     
     public void draw(PGraphics buf) {
         
+    	if (rect==null) return;
         if (slotsUsedByUser==null || slotsQueuedByUser==null) return;
         
         for(String username : legend.getColorAssignments().keySet()) {
@@ -80,6 +81,10 @@ public class SummaryView implements Drawable {
         return null;
     }
     
+    public void setRect(Rectangle rect) {
+    	this.rect = rect;
+    }
+    
     public class UserSummaryView implements SizedDrawable {
 
         private Rectangle rect;
@@ -104,6 +109,7 @@ public class SummaryView implements Drawable {
         }
         
         public Rectangle getPositionedRect() {
+        	if (rect==null) return null;
             if (rect.getPos().x==0 && rect.getPos().y==0) return null; // Not yet positioned
             return rect;
         }

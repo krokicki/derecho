@@ -2,3 +2,4 @@
 bin
 app.properties
 derecho.log
+/build

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<grid>
+    <subset name="JFRC Compute Cluster - New Grid">
+        <nodes pattern="h0*(\d+)u0*(\d+)" slots="16"/>
+    </subset>
+    <subset name="JFRC Compute Cluster - Legacy Grid">
+        <nodes pattern="f0(0)u0*(\d+)" slots="7"/>
+        <nodes pattern="f15u04a" slots="4" row="15" col="4"/>
+        <nodes pattern="f15u04b" slots="2" row="15" col="5"/>
+        <nodes pattern="f15u05a" slots="2" row="15" col="6"/>
+        <nodes pattern="f15u05b" slots="2" row="15" col="7"/>
+        <nodes pattern="f(15)u0?(\d+)" slots="7"/>
+        <nodes pattern="f(16)u0?(\d+)" slots="7"/>
+        <nodes pattern="f(16)u(33)" slots="4"/>
+        <nodes pattern="f0*(\d+)u0*(\d+)" slots="8"/>
+    </subset>
+</grid>
+

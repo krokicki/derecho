@@ -29,7 +29,7 @@ public class LineGraph implements Drawable {
     
     private final Timeline timeline;
     private final Map<Long, Integer> graphMap;
-    private final Rectangle rect;
+    private Rectangle rect;
     private int maxValue;
     private int color = Utils.color("FF0000");
     
@@ -125,5 +125,9 @@ public class LineGraph implements Drawable {
 
     public Map<Long, Integer> getGraphMap() {
         return graphMap;
+    }
+    
+    public void setRect(Rectangle rect) {
+    	this.rect = rect;
     }
 }

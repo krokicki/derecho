@@ -29,7 +29,8 @@ public class FlowLayout {
     }
     
     public void drawInRegion(Collection<? extends SizedDrawable> drawables, Rectangle region) {
-        
+    	if (region==null) return;
+    	
         Rectangle drawArea = new Rectangle(region.getPos().x+padding, region.getPos().y+padding, region.getWidth()-padding*2, region.getHeight()-padding*2);
         
         List<Row> rows = new ArrayList<Row>();

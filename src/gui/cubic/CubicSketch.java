@@ -325,8 +325,6 @@ public class CubicSketch extends PApplet {
                 	cam.setDistance(newZoom);
                 }
                 
-                System.out.println(zoomSpeed+" -> "+cam.getDistance());
-                
                 progressBar.setVisible(false);
                 slider.setVisible(true);
             
@@ -490,7 +488,6 @@ public class CubicSketch extends PApplet {
             public void onFailure(Throwable thrown) {
                 futureTimeline = null;
                 log.error("Error loading initial timeline",thrown);
-                System.err.println("Error connecting to database. Make sure that your database properties are correctly configured and specified with -DCONFIG=your.properties");
                 System.exit(1);
             }
         });     

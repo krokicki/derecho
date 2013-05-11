@@ -23,7 +23,7 @@ public class ConfigProperties extends Properties {
 
     public static ConfigProperties getInstance() {
         if (singleton==null) {
-            String propertiesFileName = System.getProperty("CONFIG");
+            String propertiesFileName = System.getProperty("APP_CONFIG");
             if (propertiesFileName == null) propertiesFileName = DEFAULT_CONFIG_FILENAME;
             singleton = new ConfigProperties();
             singleton.load(propertiesFileName);
@@ -41,7 +41,8 @@ public class ConfigProperties extends Properties {
             log.info("Loaded properties from "+propertiesFileName);
         }
         catch (Exception e) {
-            log.error("Could not read properties file: " + propertiesFileName);
+            log.error("Could not load properties file: " + propertiesFileName);
+            throw new RuntimeException(e);
         }
     }
 

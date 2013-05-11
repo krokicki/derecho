@@ -20,12 +20,12 @@ public abstract class Sprite implements Drawable {
     protected int countdown = 0;
     protected String name;
     protected String tooltip;
-    protected PVector pos;
+    protected PVector pos = new PVector(0,0);
     protected float opacity = 255;
-    protected  Set<Motion> tweens = new HashSet<Motion>();
+    protected Set<Motion> tweens = new HashSet<Motion>();
 
     public Sprite(PVector pos) {
-        this.pos = new PVector(pos.x, pos.y);
+    	setPos(pos);
     }
 
     public void update() {
@@ -92,7 +92,9 @@ public abstract class Sprite implements Drawable {
     }
 
     public void setPos(PVector pos) {
-        this.pos = pos;
+    	if (pos!=null) {
+    		this.pos.set(pos.x, pos.y, 0);
+    	}
     }
 
     public float getOpacity() {

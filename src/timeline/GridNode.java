@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The state of a grid node which may change over time as the state of the grid moved through a timeline. 
+ * The state of a grid node which may change over time as the state of the grid moves through a timeline. 
  * 
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
@@ -15,11 +15,12 @@ public class GridNode {
 
     private static final Logger log = LoggerFactory.getLogger(GridNode.class);
     
-    private String shortName;
-    private GridJob[] slots = new GridJob[GridState.SLOTS_PER_NODE];
+    private final String shortName;
+    private final GridJob[] slots;
 
-    public GridNode(String shortName) {
+    public GridNode(String shortName, int numSlots) {
         this.shortName = shortName;
+        this.slots = new GridJob[numSlots];
     }
     
     public String getShortName() {

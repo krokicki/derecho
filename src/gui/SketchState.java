@@ -1,5 +1,6 @@
 package gui;
 
+import gui.GridConfig.NodeConfiguration;
 import gui.Rectangle.Bounds;
 import ijeoma.motion.tween.NumberProperty;
 import ijeoma.motion.tween.Tween;
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import processing.core.*;
 import snapshot.Snapshot;
 import timeline.*;
+import util.ArrayUtils;
 import util.ConfigProperties;
 
 import com.google.common.collect.*;
@@ -38,6 +40,8 @@ public class SketchState implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(SketchState.class);
 
+    private static final int SLOTS_PER_ROW = 4;
+    
     // Timing
     private static final float DURATION_JOB_SUB = 40.0f;
     private static final float DURATION_JOB_START = 20.0f;
@@ -134,13 +138,9 @@ public class SketchState implements Runnable {
     private final PFont titleFont;
     
     // Sizing variables
-    private int numCols;
-    private int numRows;
     private float topPadding = 40;
     private float padding = 20;
     private float rectSpacing = 10;
-    private float nodeWidth;
-    private float nodeHeight;
     private float nodeLabelHeight = 15;
     private float slotWidth;
     private float slotHeight;
@@ -170,6 +170,7 @@ public class SketchState implements Runnable {
     // Sprites
     private Legend legend;
     private SummaryView summaryView;
+    private Map<String,GridNodeArray> gridSubsets = new LinkedHashMap<String,GridNodeArray>();
     private Map<String,NodeSprite> nodeSprites = new HashMap<String,NodeSprite>();
     private Map<String,SlotSprite> slotSprites = new HashMap<String,SlotSprite>();
     private LinkedList<String> queuedJobs = new LinkedList<String>();
@@ -182,7 +183,6 @@ public class SketchState implements Runnable {
     private Map<String,Long> slotStartOffsets = new HashMap<String,Long>();
     
     // Overall state
-    private String title;
     private Timeline timeline;
     private boolean summaryMode = true;
     private boolean bwMode = false;
@@ -190,6 +190,8 @@ public class SketchState implements Runnable {
     // State for playing
     private PlayState playState = PlayState.PAUSED;
     private GridState state;
+    private String currSubsetName;
+    
     private double playSpeed = 1.0f;
     private long totalElapsed = 0;
     private Date lastSliceRequestDate;
@@ -211,9 +213,8 @@ public class SketchState implements Runnable {
     // Draw snapshot lines on the graphs?
     private boolean isDrawSnapshotLines = false;
     
-    public SketchState(PApplet p, Timeline timeline, float width, float height, String title) {
+    public SketchState(PApplet p, Timeline timeline, float width, float height) {
         this.p = p;
-        this.title = title;
         this.width = width;
         this.height = height;
         this.timeline = timeline;
@@ -518,13 +519,13 @@ public class SketchState implements Runnable {
     private void updateWindowSizes() {
 
         // Legend Window 
-        float legendHeight = 10;
-        if (legend!=null) legendHeight = legend.getHeight();
+        float legendHeight = legend!=null ? legend.getHeight() : 10;
         this.legendRect = new Rectangle(padding, graphRect.getBounds().minY-legendHeight-rectSpacing, graphRect.getWidth(), legendHeight);
         if (legend!=null) legend.setRect(legendRect);
         
         // Summary Window
         this.summaryViewRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, graphRect.getWidth(), graphRect.getBounds().minY-gridRect.getBounds().maxY-2*rectSpacing);
+        if (summaryView!=null) summaryView.setRect(summaryViewRect);
         
         // Queue Window
         this.queuedJobWidth = slotWidth; 
@@ -588,6 +589,8 @@ public class SketchState implements Runnable {
     
     private void initState() {
 
+        this.gridSubsets.clear();
+        this.currSubsetName = null;
         this.nodeSprites.clear();
         this.slotSprites.clear();
         this.queuedJobs.clear();
@@ -597,92 +600,73 @@ public class SketchState implements Runnable {
         
         this.nodeSpacing = (float)width / (float)400;
 
-        this.numRows = state.getNumRows();
-        this.numCols = state.getNumCols();
-        
-        // These are defined in a specific order!
-        
-        // Grid Window
-        float gridWidth = width-2*padding;
-        this.nodeWidth = ((gridWidth + nodeSpacing) / numCols) - nodeSpacing;
-        this.slotWidth = slotHeight = (nodeWidth - slotSpacing * 5) / 4;
-        this.nodeHeight = slotSpacing * 3 + slotHeight * 2 + nodeLabelHeight;
-        float gridHeight = (nodeHeight + nodeSpacing) * numRows - nodeSpacing;
-        this.gridRect = new Rectangle(padding, padding+topPadding, gridWidth, gridHeight);
-
-        // Graph Window
-        float graphWindowWidth = gridWidth;
-        float graphWindowHeight = Math.round((float)height*.15);
-        float graphWindowX = padding;
-        float graphWindowY = height-graphWindowHeight-padding;
-        this.graphRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight); 
-
-        // Graph Body
-        float graphTopPadding =  Math.round((float)graphWindowHeight*.10);
-        float graphBodyWidth = graphWindowWidth;
-        float graphBodyHeight = graphWindowHeight-graphTopPadding*2;
-        float graphBodyX = graphWindowX;
-        float graphBodyY = graphWindowY+graphTopPadding;
-        this.graphBodyRect = new Rectangle(graphBodyX, graphBodyY, graphBodyWidth, graphBodyHeight);
-        Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyWidth, graphBodyHeight-10);
-
-        // Size the dynamic windows
-        updateWindowSizes();
-        
         // Initialize Views
-        this.legend = new Legend(legendRect, legendFont, legendFontHeight);
-        this.summaryView = new SummaryView(summaryViewRect, statsFont, statsFontHeight, legend);
+        this.legend = new Legend(null, legendFont, legendFontHeight);
+        this.summaryView = new SummaryView(null, statsFont, statsFontHeight, legend);
 
         // Initialize Graphs
         Map<Long, Integer> runningJobsMap = timeline.getNumRunningJobsMap();
         Map<Long, Integer> queuedJobsMap = timeline.getNumQueuedJobsMap();
-        this.runningJobsGraph = new LineGraph(graphPaddedRect, timeline, runningJobsMap);
+        this.runningJobsGraph = new LineGraph(null, timeline, runningJobsMap);
         this.runningJobsGraph.setColor(colorScheme.graphLineColorRunningJobs); 
-        this.queuedJobsGraph = new LineGraph(graphPaddedRect, timeline, queuedJobsMap);
+        this.queuedJobsGraph = new LineGraph(null, timeline, queuedJobsMap);
         this.queuedJobsGraph.setColor(colorScheme.graphLineColorQueuedJobs);
-        
+
         // Initialize sprites from the grid state
-        for (int i = 0; i < numCols; i++) {
-            for (int j = 0; j < numRows; j++) {
-                GridNode node = state.getGrid()[i][j];
-                if (node==null) continue;
-                PVector pos = new PVector((nodeWidth + nodeSpacing) * i, (nodeHeight + nodeSpacing) * j);
-                NodeSprite nodeSprite = createNodeSprite(PVector.add(gridRect.getPos(), pos), node);
-                
-                nodeSprites.put(nodeSprite.name, nodeSprite);
-                for(SlotSprite slotSprite : nodeSprite.slots) {
-                    slotSprites.put(slotSprite.name, slotSprite);
-                }
-                
-                int s = 0;
-                for(GridJob job : node.getSlots()) {
-                    if (job!=null) {
-                        log.trace("  Adding running job {}",job.getFullJobId());
-                        
-                        SlotSprite slotSprite = nodeSprite.slots[s];
-                        JobSprite jobSprite = createJobSprite(job, slotSprite.pos);
-                        jobSprite.slotName = slotSprite.name;
-                        
-                        addJobSprite(job.getFullJobId(),jobSprite);
-                        
-                        log.debug("Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
-                        slotStartOffsets.put(slotSprite.name, nextStartingPosition);
-                    }
-                    s++;
-                }
+
+    	GridConfig config = GridConfig.getInstance();
+    	for(GridNode node : state.getNodeMap().values()) {
+    		NodeConfiguration nodeConfig = config.getConfiguration(node.getShortName());
+            String subsetName = nodeConfig.getNodeSet().getSubset().getName();
+    		int numSlots = nodeConfig.getNodeSet().getSlots();
+    		int i = nodeConfig.getCol();
+    		int j = nodeConfig.getRow();
+            NodeSprite nodeSprite = createNodeSprite(null, node, numSlots);
+            
+            nodeSprites.put(nodeSprite.name, nodeSprite);
+            for(SlotSprite slotSprite : nodeSprite.slots) {
+                slotSprites.put(slotSprite.name, slotSprite);
             }
-        }
+            
+            if (this.currSubsetName==null) {
+            	this.currSubsetName = subsetName;
+            }
+            
+            GridNodeArray subset = gridSubsets.get(subsetName);
+            if (subset==null) {
+            	subset = new GridNodeArray();
+            	gridSubsets.put(subsetName, subset);
+            }
+
+            subset.setNode(i, j, nodeSprite);
+            
+            int s = 0;
+            for(GridJob job : node.getSlots()) {
+                if (job!=null) {
+                    log.trace("  Adding running job {}",job.getFullJobId());
+                    
+                    SlotSprite slotSprite = nodeSprite.slots[s];
+                    JobSprite jobSprite = createJobSprite(job, slotSprite.pos);
+                    jobSprite.slotSprite = slotSprite;
+                    
+                    addJobSprite(job.getFullJobId(),jobSprite);
+                    
+                    log.debug("Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
+                    slotStartOffsets.put(slotSprite.name, nextStartingPosition);
+                }
+                s++;
+            }
+    	}
         
-        int i = 0;
         for(GridJob job : state.getQueuedJobs()) {
             log.trace("  Adding queued job {}",job.getFullJobId());
-            PVector pos = getQueuedPosition(job.getFullJobId(), i);
-            JobSprite jobSprite = createJobSprite(job, pos);            
+            JobSprite jobSprite = createJobSprite(job, null);            
             jobSprite.queued = true;
             addJobSprite(job.getFullJobId(),jobSprite);
             queuedJobs.add(job.getFullJobId());
-            i++;
         }
+        
+        resizeForSubset();
         
         // Initialize Buffers
         // The way this is done is very deliberate. The buffer needs to be fully initialized before being available 
@@ -716,6 +700,78 @@ public class SketchState implements Runnable {
         offscreenGraphBuffer.endDraw();
         this.offscreenGraphBuffer = offscreenGraphBuffer;
     }
+
+    private void resizeForSubset() {
+
+        // All sizes are defined in a specific order!
+    	GridNodeArray subset = gridSubsets.get(currSubsetName);
+    	int numRows = subset.getNumRows();
+    	int numCols = subset.getNumCols();
+    	int emptyRows = subset.getNumEmptyRows();
+    	int emptyCols = subset.getNumEmptyCols();
+        PVector gridPos = new PVector(padding, padding+topPadding);
+
+        // Position grid nodes for the current subset
+        float gridWidth = width-2*padding;
+        float nodeWidth = ((gridWidth + nodeSpacing) / (numCols-emptyCols)) - nodeSpacing;
+        this.slotWidth = slotHeight = (nodeWidth - slotSpacing * 5) / 4;
+        float gridHeight = 0;
+        
+        for(int j=emptyRows; j<numRows; j++) {
+        	List<NodeSprite> row = subset.getRow(j);
+    		if (row==null || row.isEmpty()) continue;
+    		int rowNum = j-emptyRows;
+    		
+    		int rowMaxSlots = 0;
+    		for(NodeSprite nodeSprite : row) {
+                if (nodeSprite!=null) {
+                	rowMaxSlots = Math.max(rowMaxSlots,nodeSprite.slots.length);
+                }
+    		}
+    		
+    		int slotRows = (int)Math.ceil((double)rowMaxSlots / (double)SLOTS_PER_ROW);
+            float nodeHeight = slotSpacing * (slotRows+1) + slotHeight * slotRows + nodeLabelHeight;
+
+	        for(int i=emptyCols; i<row.size(); i++) {
+	        	NodeSprite nodeSprite = row.get(i);
+	    		if (nodeSprite==null) continue;
+	    		int colNum = i-emptyCols;
+	    		
+        		PVector pos = new PVector((nodeWidth + nodeSpacing) * colNum, (nodeHeight + nodeSpacing) * rowNum);
+        		pos.add(gridPos);
+        		nodeSprite.setRect(new Rectangle(pos.x, pos.y, nodeWidth, nodeHeight));
+        	}
+
+        	if (gridHeight>0) gridHeight += nodeSpacing;
+        	gridHeight += nodeHeight;
+    	}
+
+        // Grid Window
+        this.gridRect = new Rectangle(gridPos.x, gridPos.y, gridWidth, gridHeight);
+        
+        // Graph Window
+        float graphWindowWidth = gridWidth;
+        float graphWindowHeight = Math.round((float)height*.15);
+        float graphWindowX = padding;
+        float graphWindowY = height-graphWindowHeight-padding;
+        this.graphRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight); 
+
+        // Graph Body
+        float graphTopPadding =  Math.round((float)graphWindowHeight*.10);
+        float graphBodyWidth = graphWindowWidth;
+        float graphBodyHeight = graphWindowHeight-graphTopPadding*2;
+        float graphBodyX = graphWindowX;
+        float graphBodyY = graphWindowY+graphTopPadding;
+        this.graphBodyRect = new Rectangle(graphBodyX, graphBodyY, graphBodyWidth, graphBodyHeight);
+        Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyWidth, graphBodyHeight-10);
+
+        // Size the dynamic windows
+        updateWindowSizes();
+
+        runningJobsGraph.setRect(graphPaddedRect);
+        queuedJobsGraph.setRect(graphPaddedRect);
+        
+    }
     
     private void updateState(long elapsed) {
         
@@ -744,7 +800,10 @@ public class SketchState implements Runnable {
             public int compare(String jid1, String jid2) {
                 GridJob j1 = state.getJobByFullId(jid1);
                 GridJob j2 = state.getJobByFullId(jid2);
-                return j1.getSubTime().compareTo(j2.getSubTime());
+                ComparisonChain chain = ComparisonChain.start()
+                		.compareFalseFirst(j1==null, j2==null)
+                		.compare(j1.getSubTime(),j2.getSubTime(), Ordering.natural().nullsLast());
+                return chain.result();
             }
         });
         
@@ -907,6 +966,11 @@ public class SketchState implements Runnable {
         String nodeName = job.getNode().getShortName();
         NodeSprite nodeSprite = nodeSprites.get(nodeName);
         
+        if (nodeSprite==null) {
+        	log.warn("Cannot start job on a node which has no sprite: "+nodeName);
+        	return;
+        }
+        
         if (sprites.size()>1) {
             log.warn("More than one sprite for job being started: "+fullJobId);
         }
@@ -919,24 +983,25 @@ public class SketchState implements Runnable {
         int i = 0;
         GridJob[] nodeJobs = job.getNode().getSlots();
         for(int s=0; s<nodeJobs.length; s++) {
-            if (nodeJobs[s]==null) continue;
-            if (!nodeJobs[s].getFullJobId().equals(fullJobId)) continue;
+        	GridJob nodeJob = nodeJobs[s];
+            if (nodeJob==null) continue;
+            if (!nodeJob.getFullJobId().equals(fullJobId)) continue;
             found = true;
             
             SlotSprite slotSprite = nodeSprite.slots[s];
             
             if (slotStartOffsets.get(slotSprite.name)!=null) {
-                log.error("Error tracking slot start for jobId={}. Something on this slot was already started: {}",nodeJobs[s].getFullJobId(),slotSprite.name);
+                log.error("Error tracking slot start for jobId={}. Something on this slot was already started: {}",nodeJob.getFullJobId(),slotSprite.name);
             }
 
             log.debug("Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
-            slotStartOffsets.put(slotSprite.name, timeline.getOffset(nodeJobs[s].getStartTime()));
+            slotStartOffsets.put(slotSprite.name, timeline.getOffset(nodeJob.getStartTime()));
             
             if (i>0) {
                 jobSprite = cloneJobSprite(fullJobId);
             }
             
-            jobSprite.slotName = slotSprite.name;
+            jobSprite.slotSprite = slotSprite;
             
             if (tweenChanges) {
                 // scale duration to the distance that needs to be traveled
@@ -955,7 +1020,7 @@ public class SketchState implements Runnable {
                 jobSprite.tweens.add(tween);
             }
             else {
-                jobSprite.pos.set(slotSprite.pos);
+        		jobSprite.setPos(slotSprite.pos);
             }
             
             i++;
@@ -986,24 +1051,28 @@ public class SketchState implements Runnable {
         int i = 0;
         for(JobSprite jobSprite : sprites) {
 
-            if (jobSprite.slotName!=null) {
-                Long startOffset = slotStartOffsets.get(jobSprite.slotName);
+            if (jobSprite.slotSprite!=null) {
+            	String slotName = jobSprite.slotSprite.name;
+                Long startOffset = slotStartOffsets.get(slotName);
                 if (startOffset==null) {
-                    log.error("Error tracking slot end for jobId: {}. No start offset for slot: {}",fullJobId,jobSprite.slotName);
+                    log.error("Error tracking slot end for jobId: {}. No start offset for slot: {}",fullJobId,slotName);
                 }
                 else {
                     long timeInUse = endOffset - startOffset;
-                    Long currUse = slotUsage.get(jobSprite.slotName);
+                    Long currUse = slotUsage.get(slotName);
                     if (currUse==null) currUse = 0L;
                     if (timeInUse>0) {
-                        slotUsage.put(jobSprite.slotName, currUse+timeInUse);
+                        slotUsage.put(slotName, currUse+timeInUse);
                     }
-                    slotStartOffsets.remove(jobSprite.slotName);
-                    log.debug("Removing job from slot: {}",jobSprite.slotName);
+                    slotStartOffsets.remove(slotName);
+                    log.debug("Removing job from slot: {}",slotName);
                 }
             }
             
-            PVector endPos = new PVector(jobSprite.pos.x, jobSprite.pos.y - 20);
+            PVector endPos = new PVector(0,0);
+            if (jobSprite.pos!=null) {
+            	endPos = new PVector(jobSprite.pos.x, jobSprite.pos.y - 20);
+            }
             
             if (tweenChanges) {
                 Tween tween = new Tween("end_job_"+fullJobId+"#"+i,getTweenDuration(DURATION_JOB_END))
@@ -1022,8 +1091,8 @@ public class SketchState implements Runnable {
         }
     }
     
-    private NodeSprite createNodeSprite(PVector pos, GridNode node) {
-        NodeSprite nodeSprite = new NodeSprite(pos, node);
+    private NodeSprite createNodeSprite(PVector pos, GridNode node, int numSlots) {
+        NodeSprite nodeSprite = new NodeSprite(pos, node, numSlots);
         return nodeSprite;
     }
     
@@ -1075,9 +1144,8 @@ public class SketchState implements Runnable {
         offscreenBuffer.beginDraw();
         offscreenBuffer.background(colorScheme.gridBackgroundColor);
         
-        for(NodeSprite nodeSprite : nodeSprites.values()) {
-            nodeSprite.draw(offscreenBuffer);
-        }
+        GridNodeArray subset = gridSubsets.get(currSubsetName);
+        subset.draw(offscreenBuffer);
         
         if (isHeatmap) {
             
@@ -1099,7 +1167,6 @@ public class SketchState implements Runnable {
                 offscreenBuffer.line(x, b.minY, x, b.maxY);
             }        
             
-
             offscreenBuffer.textFont(legendFont);
             Utils.stroke(offscreenBuffer, colorScheme.titleFontColor);
             Utils.fill(offscreenBuffer, colorScheme.titleFontColor);
@@ -1109,34 +1176,8 @@ public class SketchState implements Runnable {
             offscreenBuffer.text("100%", b.maxX, b.maxY+5);
             offscreenBuffer.textAlign(PApplet.CENTER, PApplet.TOP);
             offscreenBuffer.text("Percent Of Time In Use", width/2, b.maxY+5);
-            
         }
         else {
-//          List<JobSprite> sprites = new ArrayList<JobSprite>(getJobSprites().values());
-//          Collections.sort(sprites, new Comparator<JobSprite>() {
-//              @Override
-//              public int compare(JobSprite o1, JobSprite o2) {
-//                  Integer y1 = Math.round(o1.pos.y);
-//                  Integer y2 = Math.round(o2.pos.y);
-//                  if (y1==y2) {
-//                      Integer x1 = Math.round(o1.pos.x);
-//                      Integer x2 = Math.round(o2.pos.x);
-//                      return x1.compareTo(x2);
-//                  }
-//                  return y1.compareTo(y2);
-//              }
-//          });
-
-            // Draw jobs
-            Iterator<JobSprite> i = getJobSprites().values().iterator();
-            while (i.hasNext()) {
-                Sprite sprite = i.next();
-                if (!sprite.isStatic()) continue;
-
-                sprite.draw(offscreenBuffer);
-                sprite.update();
-            }
-            
             if (summaryMode) {
                 // Draw summary view
                 summaryView.draw(offscreenBuffer);
@@ -1155,11 +1196,11 @@ public class SketchState implements Runnable {
         offscreenBuffer.line(0, gridRuleY, width, gridRuleY);
         offscreenBuffer.line(0, graphRuleY, width, graphRuleY);
 
-        // Draw title
+        // Draw subset name as title
         offscreenBuffer.textAlign(PApplet.CENTER, PApplet.TOP);
         offscreenBuffer.textFont(titleFont);
         Utils.fill(offscreenBuffer, colorScheme.titleFontColor);    
-        offscreenBuffer.text(title, width/2, 10);
+        offscreenBuffer.text(currSubsetName, width/2, 10);
         
         // Draw graph window
         drawGraphWindow(offscreenBuffer);
@@ -1305,38 +1346,50 @@ public class SketchState implements Runnable {
     
     public class NodeSprite extends Sprite {
 
-        protected SlotSprite[] slots = new SlotSprite[GridState.SLOTS_PER_NODE];
-        protected JobSprite[] jobs = new JobSprite[GridState.SLOTS_PER_NODE];
+    	protected GridNode node;
+        protected SlotSprite[] slots;
+        protected JobSprite[] jobs;
+        protected Rectangle rect;
  
-        NodeSprite(PVector pos, GridNode node) {
+        NodeSprite(PVector pos, GridNode node, int numSlots) {
             super(pos);
+            this.node = node;
             this.name = node.getShortName();
             this.tooltip = "Node "+name;
-            
-            for (int s = 0; s < GridState.SLOTS_PER_NODE; s++) {
-                float sx, sy, i;
-                if (s < 4) {
-                    i = s;
-                    sy = slotSpacing;
-                } else {
-                    i = s - 4;
-                    sy = 2 * slotSpacing + slotHeight;
-                }
-                sx = i * (slotWidth + slotSpacing) + slotSpacing;
-                slots[s] = new SlotSprite(new PVector(pos.x + sx, pos.y + nodeLabelHeight + sy));
+            this.slots = new SlotSprite[numSlots];
+            this.jobs = new JobSprite[numSlots];
+            for (int s = 0; s<numSlots; s++) {
+                slots[s] = new SlotSprite(null, this);
                 slots[s].name = name+"/"+s;
                 slots[s].tooltip = tooltip+", Slot #"+s;
             }
         }
 
+        public void setPos(PVector pos) {
+        	super.setPos(pos);
+        	if (slots==null) return;
+    		int row = 0;
+            for (int s = 0; s<slots.length; s++) {
+            	float col = s % SLOTS_PER_ROW;
+                float sx = col * (slotWidth + slotSpacing) + slotSpacing;
+                float sy = (row+1)*slotSpacing + row*slotHeight;
+            	slots[s].setPos(new PVector(pos.x + sx, pos.y + nodeLabelHeight + sy));
+            	if (col+1==SLOTS_PER_ROW) {
+            		row++;
+            	}
+            }
+        }
+
         public void draw(PGraphics buf) {
+        	if (rect==null) return;
+        	
             buf.strokeWeight(1);
             Utils.fill(buf, colorScheme.nodeBackgroundColor, opacity);
             Utils.stroke(buf, colorScheme.nodeBorderColor, opacity);
               
-            buf.rect(pos.x, pos.y, nodeWidth, nodeHeight);
+            buf.rect(pos.x, pos.y, rect.getWidth(), rect.getHeight());
             
-            for (int s = 0; s < GridState.SLOTS_PER_NODE; s++) {
+            for (int s = 0; s<slots.length; s++) {
                 slots[s].draw(buf);
             }
 
@@ -1344,22 +1397,33 @@ public class SketchState implements Runnable {
             
             buf.textFont(nodeFont);
             buf.textAlign(PApplet.CENTER, PApplet.CENTER);
-            float x = pos.x + nodeWidth/2;
+            float x = pos.x + rect.getWidth()/2;
             float y = pos.y + nodeLabelHeight/2;
             buf.text(name, (int)x, (int)y);
         }
         
         public void draw() { }
+
+		public Rectangle getRect() {
+			return rect;
+		}
+
+		public void setRect(Rectangle rect) {
+			setPos(rect.getPos());
+			this.rect = rect;
+		}
     }
 
     public class SlotSprite extends Sprite {
 
-        SlotSprite(PVector pos) {
+    	protected NodeSprite nodeSprite;
+    	
+        SlotSprite(PVector pos, NodeSprite nodeSprite) {
             super(pos);
+            this.nodeSprite = nodeSprite;
         }
 
         public void draw(PGraphics buf) {
-            
             if (isHeatmap) {
                 Long usage = slotUsage.get(name);
                 int slotColor = buf.color(0, 100, 100);
@@ -1391,6 +1455,10 @@ public class SketchState implements Runnable {
             buf.strokeWeight(1);
             buf.rect(pos.x, pos.y, slotWidth, slotHeight);
         }
+        
+        public NodeSprite getNodeSprite() {
+        	return nodeSprite;
+        }
     }
     
     public class JobSprite extends Sprite {
@@ -1401,15 +1469,20 @@ public class SketchState implements Runnable {
         protected boolean queued = false;
         protected boolean defunct = false;
         protected PVector endPos; // used for laser tracking
-        protected String slotName; // used for heatmap usage tracking
+        protected SlotSprite slotSprite;
         
         JobSprite(PVector pos, String username) {
             super(pos);
             this.username = username;
         }
 
-        public void draw(PGraphics buf) {           
-            
+        public void draw(PGraphics buf) {
+        	
+        	if (tweens.isEmpty() && slotSprite!=null && slotSprite.getPos().x>0 && slotSprite.getPos().y>0) {
+        		// Update the job's position to the slotSprite it is supposed to sit on
+        		setPos(slotSprite.getPos());
+        	}
+        	
             buf.strokeWeight(1);
 
             if (endPos!=null && isDrawLaserTracking) {
@@ -1456,12 +1529,119 @@ public class SketchState implements Runnable {
         }
         
         public void jobEnded() {
+        	slotSprite = null;
             defunct = true;
             opacity = 0; // just in case
         }
 
         public String getUsername() {
             return username;
+        }
+        
+        public SlotSprite getSlotSprite() {
+        	return slotSprite;
+        }
+    }
+    
+    public class GridNodeArray implements Drawable {
+    	
+    	private Set<NodeSprite> sprites = new HashSet<NodeSprite>();
+    	private List<List<NodeSprite>> grid = new ArrayList<List<NodeSprite>>();
+    	
+    	public void setNode(int x, int y, NodeSprite nodeSprite) {
+    		ArrayUtils.ensureSize((ArrayList<?>)grid, y+1);
+    		List<NodeSprite> row = grid.get(y);
+    		if (row==null) {
+    			row = new ArrayList<NodeSprite>();
+    			grid.set(y, row);
+    		}
+    		ArrayUtils.ensureSize((ArrayList<?>)row, x+1);
+    		row.set(x, nodeSprite);
+    		sprites.add(nodeSprite);
+    	}
+    	
+    	public NodeSprite getNode(int x, int y) {
+    		List<NodeSprite> row = grid.get(y);
+    		if (row==null) return null;
+    		return row.get(x);
+    	}
+
+    	public int getNumEmptyRows() {
+	        int emptyRows = 0;
+	    	for(List<NodeSprite> row : grid) {
+	    		if (row!=null && !row.isEmpty()) break;
+	    		emptyRows++;
+	    	}
+	    	return emptyRows;
+    	}
+
+    	public int getNumEmptyCols() {
+	        int emptyCols = Integer.MAX_VALUE;
+	    	for(List<NodeSprite> row : grid) {
+	    		if (row==null || row.isEmpty()) continue;
+	    		int emptyRowCols = 0;
+		    	for(NodeSprite nodeSprite : row) {
+		    		if (nodeSprite!=null) break;
+		    		emptyRowCols++;
+				}
+		    	emptyCols = Math.min(emptyCols, emptyRowCols);
+	    	}
+	    	return emptyCols;
+    	}
+    	
+    	public int getNumRows() {
+    		return grid.size();
+    	}
+    	
+    	public int getNumCols() {
+    		int max = 0;
+    		for(List<NodeSprite> row : grid) {
+    			if (row==null) continue;
+    			if (row.size() > max) {
+    				max = row.size();
+    			}
+    		}
+    		return max;
+    	}
+    	
+    	public List<List<NodeSprite>> getRows() {
+    		return grid;
+    	}
+    	
+    	public List<NodeSprite> getRow(int row) {
+    		return grid.get(row);
+    	}
+
+        public void draw(PGraphics buf) {
+
+        	for(List<NodeSprite> row : grid) {
+        		if (row==null) continue;
+        		for(NodeSprite nodeSprite : row) {
+                    if (nodeSprite!=null) nodeSprite.draw(buf);
+        		}
+        	}
+        	
+            if (!isHeatmap) {
+                // Draw jobs
+                Iterator<JobSprite> i = getJobSprites().values().iterator();
+                while (i.hasNext()) {
+                	JobSprite sprite = i.next();
+                    if (sprite.isStatic()) {
+                    	if (sprite.slotSprite!=null) {
+                    		if (sprite.slotSprite.nodeSprite!=null) {
+                    			if (nodeSpriteInSubset(sprite.slotSprite.nodeSprite)) {
+            	                    sprite.draw(buf);
+                    			}
+                    		}
+                    	}
+	                    sprite.update();
+                    }
+                }
+            }
+        }
+    	
+        public boolean nodeSpriteInSubset(NodeSprite nodeSprite) {
+        	return sprites.contains(nodeSprite);
         }
     }
 
@@ -1550,5 +1730,20 @@ public class SketchState implements Runnable {
     
     public void setTimeline(Timeline timeline) {
         this.timeline = timeline;
+    }
+    
+    public Collection<String> getSubsetNames() {
+    	return gridSubsets.keySet();
+    }
+    
+    public void setCurrentSubsetName(String subsetName) {
+    	if (currSubsetName.equals(subsetName)) return;
+    	log.debug("Changing current subset to {}",subsetName);
+     	this.currSubsetName = subsetName;
+    	resizeForSubset();
+    }
+    
+    public GridNodeArray getCurrentSubset() {
+    	return gridSubsets.get(currSubsetName);
     }
 }

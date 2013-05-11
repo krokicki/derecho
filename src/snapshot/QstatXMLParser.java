@@ -129,7 +129,7 @@ public class QstatXMLParser {
         QstatXMLParser parser = new QstatXMLParser();
         Snapshot snapshot = parser.loadFromFile("grid1.xml");
         GridState state = new GridState(snapshot,"testState");
-        state.printGridSummary();
+        //state.printGridSummary();
     }
     
 }
