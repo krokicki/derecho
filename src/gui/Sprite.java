@@ -7,6 +7,8 @@ import java.util.Set;
 
 import processing.core.PVector;
 
+import com.google.common.collect.ImmutableSet;
+
 /**
  * A named Drawable object with position and opacity. May have associated tweens for changing state over time. 
  * 
@@ -22,7 +24,7 @@ public abstract class Sprite implements Drawable {
     protected String tooltip;
     protected PVector pos = new PVector(0,0);
     protected float opacity = 255;
-    protected Set<Motion> tweens = new HashSet<Motion>();
+    private Set<Motion> tweens = new HashSet<Motion>();
 
     public Sprite(PVector pos) {
     	setPos(pos);
@@ -109,7 +111,13 @@ public abstract class Sprite implements Drawable {
 
     public Set<Motion> getTweens() {
     	synchronized (tweens) {
-    		return tweens;
+    		return  ImmutableSet.copyOf(tweens);
+    	}
+    }
+    
+    public void addTween(Motion tween) {
+    	synchronized (tweens) {
+    		tweens.add(tween);
     	}
     }
 }

@@ -40,7 +40,7 @@ public class GridSketch extends PApplet {
 
     private static final Logger log = LoggerFactory.getLogger(GridSketch.class);
 
-    private static final String MAIN_CLASS = "gui.GridSketch";
+    private static final String MAIN_CLASS = GridSketch.class.getName();
     private static final long LIVE_POLL_INTERVAL_SECONDS = ConfigProperties.getInteger("derecho.data.poll.secs",5);
     private static final int MAX_DRAWING_ERRORS = 5;
     

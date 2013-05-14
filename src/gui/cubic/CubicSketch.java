@@ -38,7 +38,7 @@ public class CubicSketch extends PApplet {
 
     private static final Logger log = LoggerFactory.getLogger(GridSketch.class);
 
-    private static final String MAIN_CLASS = "gui.cubic.CubicSketch";
+    private static final String MAIN_CLASS = CubicSketch.class.getName();
     private static final long LIVE_POLL_INTERVAL_SECONDS = ConfigProperties.getInteger("derecho.data.poll.secs",5);
     private static final int MAX_DRAWING_ERRORS = 5;
     

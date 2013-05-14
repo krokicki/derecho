@@ -720,31 +720,31 @@ public class SketchState implements Runnable {
         for(int j=emptyRows; j<numRows; j++) {
         	List<NodeSprite> row = subset.getRow(j);
     		if (row==null || row.isEmpty()) continue;
-    		int rowNum = j-emptyRows;
     		
-    		int rowMaxSlots = 0;
-    		for(NodeSprite nodeSprite : row) {
-                if (nodeSprite!=null) {
-                	rowMaxSlots = Math.max(rowMaxSlots,nodeSprite.slots.length);
-                }
-    		}
+    		float rowMaxHeight = 0;
     		
-    		int slotRows = (int)Math.ceil((double)rowMaxSlots / (double)SLOTS_PER_ROW);
-            float nodeHeight = slotSpacing * (slotRows+1) + slotHeight * slotRows + nodeLabelHeight;
-
 	        for(int i=emptyCols; i<row.size(); i++) {
 	        	NodeSprite nodeSprite = row.get(i);
 	    		if (nodeSprite==null) continue;
 	    		int colNum = i-emptyCols;
 	    		
-        		PVector pos = new PVector((nodeWidth + nodeSpacing) * colNum, (nodeHeight + nodeSpacing) * rowNum);
+	    		int slotRows = (int)Math.ceil((double)nodeSprite.slots.length / (double)SLOTS_PER_ROW);
+	            float nodeHeight = slotSpacing * (slotRows+1) + slotHeight * slotRows + nodeLabelHeight;
+	            
+	            // Keep track of the max height of any node in this row
+	            rowMaxHeight = Math.max(rowMaxHeight, nodeHeight);
+	            
+	            // Position each node
+        		PVector pos = new PVector((nodeWidth + nodeSpacing) * colNum, gridHeight);
         		pos.add(gridPos);
         		nodeSprite.setRect(new Rectangle(pos.x, pos.y, nodeWidth, nodeHeight));
         	}
 
-        	if (gridHeight>0) gridHeight += nodeSpacing;
-        	gridHeight += nodeHeight;
+        	gridHeight += rowMaxHeight + nodeSpacing;
     	}
+        
+        // Subtract the last padding
+        gridHeight -= nodeSpacing;
 
         // Grid Window
         this.gridRect = new Rectangle(gridPos.x, gridPos.y, gridWidth, gridHeight);
@@ -764,13 +764,11 @@ public class SketchState implements Runnable {
         float graphBodyY = graphWindowY+graphTopPadding;
         this.graphBodyRect = new Rectangle(graphBodyX, graphBodyY, graphBodyWidth, graphBodyHeight);
         Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyWidth, graphBodyHeight-10);
-
-        // Size the dynamic windows
-        updateWindowSizes();
-
         runningJobsGraph.setRect(graphPaddedRect);
         queuedJobsGraph.setRect(graphPaddedRect);
         
+        // Recalculate the sizes of dynamic windows
+        updateWindowSizes();
     }
     
     private void updateState(long elapsed) {
@@ -932,7 +930,7 @@ public class SketchState implements Runnable {
                 .addProperty(new NumberProperty(jobSprite, "opacity", 255))
                 .call(jobSprite, "jobQueued")
                 .noAutoUpdate(); 
-            jobSprite.tweens.add(tween);
+            jobSprite.addTween(tween);
         }
         else {
             jobSprite.opacity = 255;
@@ -1017,7 +1015,7 @@ public class SketchState implements Runnable {
                 if (isDrawLaserTracking) {
                     jobSprite.endPos = slotSprite.pos.get();
                 }
-                jobSprite.tweens.add(tween);
+                jobSprite.addTween(tween);
             }
             else {
         		jobSprite.setPos(slotSprite.pos);
@@ -1081,7 +1079,7 @@ public class SketchState implements Runnable {
                     .addProperty(new NumberProperty(jobSprite, "opacity", 0))
                     .noAutoUpdate(); 
     
-                jobSprite.tweens.add(tween);
+                jobSprite.addTween(tween);
             }
             else {
                 jobSprite.jobEnded();
@@ -1478,7 +1476,7 @@ public class SketchState implements Runnable {
 
         public void draw(PGraphics buf) {
         	
-        	if (tweens.isEmpty() && slotSprite!=null && slotSprite.getPos().x>0 && slotSprite.getPos().y>0) {
+        	if (getTweens().isEmpty() && slotSprite!=null && slotSprite.getPos().x>0 && slotSprite.getPos().y>0) {
         		// Update the job's position to the slotSprite it is supposed to sit on
         		setPos(slotSprite.getPos());
         	}
