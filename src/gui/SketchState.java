@@ -147,8 +147,8 @@ public class SketchState implements Runnable {
     private float slotSpacing = 3;
     private float nodeSpacing = 7;
     private float timeLabelOffset = 4;
+    private float summaryQueuedJobWidth = 10;
     private float queuedJobWidth = 10;
-    private float queuedJobHeight = 10;
     private float queuedJobSpacing = 3;
     private int queueItemsPerLine = 100;
     
@@ -303,7 +303,7 @@ public class SketchState implements Runnable {
                     if (sprite instanceof JobSprite) {
                         JobSprite jobSprite = (JobSprite)sprite;
                         if (jobSprite.defunct) {
-                            removeJobSprite(jobSprite.name, jobSprite);
+                            removeJobSprite(jobSprite);
                         }
                         else {
                             // Parse a jobId like this: 1275988.2828-4000:1
@@ -529,7 +529,6 @@ public class SketchState implements Runnable {
         
         // Queue Window
         this.queuedJobWidth = slotWidth; 
-        this.queuedJobHeight = slotHeight;
         this.queueRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, gridRect.getWidth(), legendRect.getBounds().minY - gridRect.getBounds().maxY - 2*rectSpacing);
         this.queueItemsPerLine = (int)Math.round(queueRect.getWidth() / (queuedJobWidth+queuedJobSpacing));
     }
@@ -548,7 +547,6 @@ public class SketchState implements Runnable {
         if (bestSquare>defaultSquare) bestSquare = defaultSquare;
 
         queuedJobWidth = bestSquare;
-        queuedJobHeight = bestSquare;
         queueItemsPerLine = (int)Math.round(queueRect.getWidth() / (queuedJobWidth+queuedJobSpacing));
     }
     
@@ -583,7 +581,7 @@ public class SketchState implements Runnable {
         }
         
         float x = (queuedJobWidth + queuedJobSpacing) * ((float)i % (float)queueItemsPerLine);
-        float y = (queuedJobHeight + queuedJobSpacing) * (float)Math.floor((float)i / (float)queueItemsPerLine);
+        float y = (queuedJobWidth + queuedJobSpacing) * (float)Math.floor((float)i / (float)queueItemsPerLine);
         return PVector.add(queueRect.getPos(),new PVector(x,y+padding));
     }
     
@@ -649,7 +647,7 @@ public class SketchState implements Runnable {
                     JobSprite jobSprite = createJobSprite(job, slotSprite.pos);
                     jobSprite.slotSprite = slotSprite;
                     
-                    addJobSprite(job.getFullJobId(),jobSprite);
+                    addJobSprite(jobSprite);
                     
                     log.debug("Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
                     slotStartOffsets.put(slotSprite.name, nextStartingPosition);
@@ -659,10 +657,10 @@ public class SketchState implements Runnable {
     	}
         
         for(GridJob job : state.getQueuedJobs()) {
-            log.trace("  Adding queued job {}",job.getFullJobId());
+            log.debug("  Adding queued job {} for {}",job.getFullJobId(),job.getOwner());
             JobSprite jobSprite = createJobSprite(job, null);            
             jobSprite.queued = true;
-            addJobSprite(job.getFullJobId(),jobSprite);
+            addJobSprite(jobSprite);
             queuedJobs.add(job.getFullJobId());
         }
         
@@ -808,24 +806,24 @@ public class SketchState implements Runnable {
         // Relocate the remaining queued job sprites
         int i = 0;
         log.trace("---------------------------------");
-        for(String jobIdString : queuedJobs) {
+        for(String fullJobId : queuedJobs) {
             
-            GridJob job = state.getJobByFullId(jobIdString);
+            GridJob job = state.getJobByFullId(fullJobId);
             
-            Collection<JobSprite> sprites = jobSpriteMap.get(jobIdString);
+            Collection<JobSprite> sprites = jobSpriteMap.get(fullJobId);
             if (sprites==null) {
-                log.warn("No such queued job: {}",jobIdString);
+                log.warn("No such queued job: {}",fullJobId);
             }
             else {
                 if (sprites.size()>1) {
-                    log.warn("More than 1 queued job sprite with id: "+jobIdString);
+                    log.warn("More than 1 queued job sprite with id: "+fullJobId);
                 }
                 for(JobSprite jobSprite : sprites) {
                     if (!jobSprite.queued) {
-                        log.warn("Unqueued job in queue: "+jobIdString);
+                        log.warn("Unqueued job in queue: "+fullJobId);
                         continue;
                     }
-                    jobSprite.pos = getQueuedPosition(jobIdString, i++);    
+                    jobSprite.pos = getQueuedPosition(fullJobId, i++);    
                     log.trace("  Relocated job to y: {}\t{}",jobSprite.pos.y,job);
                 }
             }
@@ -916,13 +914,13 @@ public class SketchState implements Runnable {
             return;
         }
 
-        log.debug("Adding queued job {}",fullJobId);
+        log.debug("Adding queued job {} for {}",job.getFullJobId(),job.getOwner());
         
         PVector pos = getQueuedPosition(fullJobId, queuedJobs.size());
         JobSprite jobSprite = createJobSprite(job, pos);
         jobSprite.opacity = 0;
         jobSprite.queued = true;
-        addJobSprite(fullJobId,jobSprite);
+        addJobSprite(jobSprite);
         queuedJobs.add(fullJobId);
         
         if (tweenChanges) {
@@ -945,7 +943,7 @@ public class SketchState implements Runnable {
             log.warn("Starting job that was never subbed: {}",fullJobId);
             JobSprite jobSprite = createJobSprite(job, new PVector(0, 0));
             jobSprite.queued = true;
-            addJobSprite(fullJobId, jobSprite);
+            addJobSprite(jobSprite);
             sprites = jobSpriteMap.get(fullJobId);
         }
 
@@ -960,6 +958,8 @@ public class SketchState implements Runnable {
         else {
             log.debug("Starting queued job {} on {}",fullJobId,job.getNode().getShortName());
         }
+        
+        log.info("# of sprites = {}, # queued jobs = {}",jobSpriteMap.size(),queuedJobs.size());
         
         String nodeName = job.getNode().getShortName();
         NodeSprite nodeSprite = nodeSprites.get(nodeName);
@@ -1075,8 +1075,8 @@ public class SketchState implements Runnable {
             if (tweenChanges) {
                 Tween tween = new Tween("end_job_"+fullJobId+"#"+i,getTweenDuration(DURATION_JOB_END))
                     .addPVector(jobSprite.pos, endPos)
-                    .call(jobSprite, "jobEnded")
                     .addProperty(new NumberProperty(jobSprite, "opacity", 0))
+                    .call(jobSprite, "jobEnded")
                     .noAutoUpdate(); 
     
                 jobSprite.addTween(tween);
@@ -1095,7 +1095,7 @@ public class SketchState implements Runnable {
     }
     
     private JobSprite createJobSprite(GridJob job, PVector pos) {
-        JobSprite jobSprite = new JobSprite(pos, job.getOwner());
+        JobSprite jobSprite = new JobSprite(pos, job.getFullJobId(), job.getOwner());
         jobSprite.color = jobSprite.borderColor = legend.getItemColor(job.getOwner());
         jobSprite.borderColor = Utils.color("FFFFFF");
         jobSprite.name = job.getFullJobId();
@@ -1103,12 +1103,12 @@ public class SketchState implements Runnable {
         return jobSprite;
     }
 
-    private void addJobSprite(String fullJobId, JobSprite jobSprite) {
-        jobSpriteMap.put(fullJobId, jobSprite);
+    private void addJobSprite(JobSprite jobSprite) {
+        jobSpriteMap.put(jobSprite.fullJobId, jobSprite);
     }
     
-    private void removeJobSprite(String fullJobId, JobSprite jobSprite) {
-        jobSpriteMap.remove(fullJobId, jobSprite);
+    private void removeJobSprite(JobSprite jobSprite) {
+        jobSpriteMap.remove(jobSprite.fullJobId, jobSprite);
     }
     
     private JobSprite cloneJobSprite(String fullJobId) {
@@ -1118,8 +1118,20 @@ public class SketchState implements Runnable {
             return null;
         }
         
-        JobSprite jobSprite = sprites.iterator().next(); // first sprite
+        // Try to find a non-clone to clone
+        JobSprite jobSprite = null;
+        for (JobSprite s : sprites) {
+    		jobSprite = s;
+        	if (!s.name.contains("#")) {
+        		break;
+        	}
+        }
+        
         GridJob job = state.getJobByFullId(fullJobId);
+        
+        if (jobSprite.name.contains("#")) {
+        	log.warn("Cloning a clone: "+jobSprite.name);
+        }
         
         if (job==null) {
             log.error("Cannot expand sprites for unknown job: "+fullJobId);
@@ -1179,10 +1191,34 @@ public class SketchState implements Runnable {
             if (summaryMode) {
                 // Draw summary view
                 summaryView.draw(offscreenBuffer);
+
+                // Draw queued jobs (one for each user)
+                Set<String> drawnUsers = new HashSet<String>();
+                Iterator<JobSprite> i = getJobSprites().values().iterator();
+                while (i.hasNext()) {
+                	JobSprite sprite = i.next();
+                    if (sprite.isStatic()) {
+                    	if (sprite.queued && !drawnUsers.contains(sprite.username)) {
+	                		drawnUsers.add(sprite.username);
+		                    sprite.draw(offscreenBuffer);
+                    	}
+                    }
+                }
             }
             else {
                 // Draw legend
                 legend.draw(offscreenBuffer);
+
+                // Draw queued jobs
+                Iterator<JobSprite> i = getJobSprites().values().iterator();
+                while (i.hasNext()) {
+                	JobSprite sprite = i.next();
+                    if (sprite.isStatic()) {
+                    	if (sprite.queued) {
+    	                    sprite.draw(offscreenBuffer);
+                    	}
+                    }
+                }
             }
         }
         
@@ -1461,6 +1497,7 @@ public class SketchState implements Runnable {
     
     public class JobSprite extends Sprite {
 
+        protected String fullJobId;
         protected String username;
         protected int color;
         protected int borderColor;
@@ -1469,8 +1506,9 @@ public class SketchState implements Runnable {
         protected PVector endPos; // used for laser tracking
         protected SlotSprite slotSprite;
         
-        JobSprite(PVector pos, String username) {
+        JobSprite(PVector pos, String fullJobId, String username) {
             super(pos);
+            this.fullJobId = fullJobId;
             this.username = username;
         }
 
@@ -1503,7 +1541,12 @@ public class SketchState implements Runnable {
             }
             
             if (queued) {
-                buf.rect(pos.x, pos.y, queuedJobWidth, queuedJobHeight);
+            	if (isSummaryMode()) {
+            		buf.rect(pos.x, pos.y, summaryQueuedJobWidth, summaryQueuedJobWidth);
+            	}
+            	else {
+            		buf.rect(pos.x, pos.y, queuedJobWidth, queuedJobWidth);
+            	}
             }
             else {
                 buf.rect(pos.x, pos.y, slotWidth, slotHeight);
@@ -1511,7 +1554,7 @@ public class SketchState implements Runnable {
         }
 
         public JobSprite copy() {
-            JobSprite copy = new JobSprite(pos, username);
+            JobSprite copy = new JobSprite(pos, fullJobId, username);
             copy.name = name;
             copy.color = this.color;
             copy.borderColor = this.borderColor;

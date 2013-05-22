@@ -361,14 +361,18 @@ public class GridSketch extends PApplet {
                     Iterator<JobSprite> i = sketchState.getJobSprites().values().iterator();
                     while (i.hasNext()) {
                     	JobSprite sprite = i.next();
-                        if (!sprite.isInMotion()) continue;
-                        if (sprite.getSlotSprite()==null) continue;
-                        if (sprite.getSlotSprite().getNodeSprite()==null) continue;
-                        if (!currSubset.nodeSpriteInSubset(sprite.getSlotSprite().getNodeSprite())) continue;
-                        sprite.draw(g);
-                        // Do not animate anything while the slider is pressed
-                        if (!sliderPressed) {
-                            sprite.update();
+                        if (sprite.isInMotion()) {
+	                        if (sprite.getSlotSprite()!=null) {
+	                        	if (sprite.getSlotSprite().getNodeSprite()!=null) {
+	                        		if (currSubset.nodeSpriteInSubset(sprite.getSlotSprite().getNodeSprite())) {
+	        	                        sprite.draw(g);
+	                        		}	
+	                        	}
+	                        }
+	                        // Do not animate anything while the slider is pressed
+	                        if (!sliderPressed) {
+	                            sprite.update();
+	                        }
                         }
                     }
                 }
