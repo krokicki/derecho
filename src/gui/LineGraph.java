@@ -107,8 +107,10 @@ public class LineGraph implements Drawable {
             values.add(y);  
         }
 
-        buf.strokeCap(PApplet.SQUARE);
-        buf.line(prevX, prevY, b.maxX-1, prevY);
+        if (prevX!=null && prevY!=null) {
+	        buf.strokeCap(PApplet.SQUARE);
+	        buf.line(prevX, prevY, b.maxX-1, prevY);
+        }
     }
     
     public int getColor() {

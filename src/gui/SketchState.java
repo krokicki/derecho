@@ -641,7 +641,7 @@ public class SketchState implements Runnable {
             int s = 0;
             for(GridJob job : node.getSlots()) {
                 if (job!=null) {
-                    log.trace("  Adding running job {}",job.getFullJobId());
+                    log.trace("Init - Adding running job {}",job.getFullJobId());
                     
                     SlotSprite slotSprite = nodeSprite.slots[s];
                     JobSprite jobSprite = createJobSprite(job, slotSprite.pos);
@@ -649,7 +649,7 @@ public class SketchState implements Runnable {
                     
                     addJobSprite(jobSprite);
                     
-                    log.debug("Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
+                    log.debug("Init - Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
                     slotStartOffsets.put(slotSprite.name, nextStartingPosition);
                 }
                 s++;
@@ -657,7 +657,7 @@ public class SketchState implements Runnable {
     	}
         
         for(GridJob job : state.getQueuedJobs()) {
-            log.debug("  Adding queued job {} for {}",job.getFullJobId(),job.getOwner());
+            log.debug("Init - Adding queued job {} for {}",job.getFullJobId(),job.getOwner());
             JobSprite jobSprite = createJobSprite(job, null);            
             jobSprite.queued = true;
             addJobSprite(jobSprite);
@@ -959,7 +959,7 @@ public class SketchState implements Runnable {
             log.debug("Starting queued job {} on {}",fullJobId,job.getNode().getShortName());
         }
         
-        log.info("# of sprites = {}, # queued jobs = {}",jobSpriteMap.size(),queuedJobs.size());
+        log.trace("# of sprites = {}, # queued jobs = {}",jobSpriteMap.size(),queuedJobs.size());
         
         String nodeName = job.getNode().getShortName();
         NodeSprite nodeSprite = nodeSprites.get(nodeName);
@@ -1104,10 +1104,12 @@ public class SketchState implements Runnable {
     }
 
     private void addJobSprite(JobSprite jobSprite) {
+    	log.trace("jobSpriteMap.put({}, {})",jobSprite.fullJobId,jobSprite.name);
         jobSpriteMap.put(jobSprite.fullJobId, jobSprite);
     }
     
     private void removeJobSprite(JobSprite jobSprite) {
+    	log.trace("jobSpriteMap.remove({}, {})",jobSprite.fullJobId,jobSprite.name);
         jobSpriteMap.remove(jobSprite.fullJobId, jobSprite);
     }
     
@@ -1515,7 +1517,8 @@ public class SketchState implements Runnable {
         public void draw(PGraphics buf) {
         	
         	if (getTweens().isEmpty() && slotSprite!=null && slotSprite.getPos().x>0 && slotSprite.getPos().y>0) {
-        		// Update the job's position to the slotSprite it is supposed to sit on
+        		// Update the job's position to the slotSprite it is supposed to sit on. This is necessary when 
+        		// job sprites are created before the slot sprites, and thus have no location initially.
         		setPos(slotSprite.getPos());
         	}
         	
@@ -1779,7 +1782,7 @@ public class SketchState implements Runnable {
     
     public void setCurrentSubsetName(String subsetName) {
     	if (currSubsetName.equals(subsetName)) return;
-    	log.debug("Changing current subset to {}",subsetName);
+    	log.trace("Changing current subset to {}",subsetName);
      	this.currSubsetName = subsetName;
     	resizeForSubset();
     }

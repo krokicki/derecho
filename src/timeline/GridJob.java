@@ -40,11 +40,12 @@ public class GridJob {
     }
     
     public String getFullJobId() {
-        String s = jobId+"";
+        StringBuilder s = new StringBuilder();
+        s.append(jobId);
         if (tasks!=null) {
-            s += "."+tasks;
+            s.append(".").append(tasks);
         }
-        return s;
+        return s.toString();
     }
         
     public String getName() {
