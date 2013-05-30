@@ -679,20 +679,22 @@ public class CubicSketchState implements Runnable {
         
         if (slotLat==null) {
         	log.warn("No slot lattice for node "+nodeName);
+        	return new PVector(0,0,0);
         }
-        
-        PVector slotLoc = slotLat.getLocation(slotName);
-        if (slotLoc==null) {
-        	log.warn("No slot location for slot "+slotName+" in node "+nodeName);
-        }
-        
-        // TODO: cache these calculations
         
         // Node position within the lattice, natural coordinates
         float nodeOffset = nodeSize + 2 * nodePadding;
         PVector nodePos = nodeLoc.get();
         nodePos.mult(nodeOffset);
         nodePos.add(nodePadding, nodePadding, nodePadding);
+        
+        PVector slotLoc = slotLat.getLocation(slotName);
+        if (slotLoc==null) {
+        	log.warn("No slot location for slot "+slotName+" in node "+nodeName);
+        	return nodePos.get();
+        }
+        
+        // TODO: cache these calculations
         
         // Slot position within the node, natural coordinates
         float slotOffset = jobSize + 2 * jobPadding;
