@@ -107,6 +107,10 @@ public class GridConfig {
     	return null;
     }
 
+    public Collection<NodeSubSet> getSubSets() {
+    	return subsets.values();
+    }
+    
     public class NodeSubSet {
     	private String name;
     	private List<NodeSet> nodeSets = new ArrayList<NodeSet>();

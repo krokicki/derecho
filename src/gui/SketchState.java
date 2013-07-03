@@ -1,6 +1,7 @@
 package gui;
 
 import gui.GridConfig.NodeConfiguration;
+import gui.GridConfig.NodeSubSet;
 import gui.Rectangle.Bounds;
 import ijeoma.motion.tween.NumberProperty;
 import ijeoma.motion.tween.Tween;
@@ -610,9 +611,17 @@ public class SketchState implements Runnable {
         this.queuedJobsGraph = new LineGraph(null, timeline, queuedJobsMap);
         this.queuedJobsGraph.setColor(colorScheme.graphLineColorQueuedJobs);
 
-        // Initialize sprites from the grid state
-
+        // Initialize the grid configuration
     	GridConfig config = GridConfig.getInstance();
+    	for(NodeSubSet nodeSubSet : config.getSubSets()) {
+    		GridNodeArray subset = new GridNodeArray();
+        	gridSubsets.put(nodeSubSet.getName(), subset);
+            if (this.currSubsetName==null) {
+            	this.currSubsetName = nodeSubSet.getName();
+            }
+    	}
+    	
+        // Initialize sprites from the grid state
     	for(GridNode node : state.getNodeMap().values()) {
     		NodeConfiguration nodeConfig = config.getConfiguration(node.getShortName());
             String subsetName = nodeConfig.getNodeSet().getSubset().getName();
@@ -626,16 +635,7 @@ public class SketchState implements Runnable {
                 slotSprites.put(slotSprite.name, slotSprite);
             }
             
-            if (this.currSubsetName==null) {
-            	this.currSubsetName = subsetName;
-            }
-            
             GridNodeArray subset = gridSubsets.get(subsetName);
-            if (subset==null) {
-            	subset = new GridNodeArray();
-            	gridSubsets.put(subsetName, subset);
-            }
-
             subset.setNode(i, j, nodeSprite);
             
             int s = 0;
@@ -1781,8 +1781,8 @@ public class SketchState implements Runnable {
     }
     
     public void setCurrentSubsetName(String subsetName) {
-    	if (currSubsetName.equals(subsetName)) return;
-    	log.trace("Changing current subset to {}",subsetName);
+    	if (currSubsetName!=null && currSubsetName.equals(subsetName)) return;
+    	log.info("Changing current subset to {}",subsetName);
      	this.currSubsetName = subsetName;
     	resizeForSubset();
     }

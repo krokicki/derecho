@@ -2,38 +2,33 @@
 <grid>
     <subset name="JFRC Compute Cluster - New Grid">
         <nodes pattern="h0*(\d+)u0*(\d+)" slots="16"/>
+        <nodes pattern="f00u01" slots="7" row="9" col="1"/>
+        <nodes pattern="f00u05" slots="7" row="9" col="2"/>
+        <nodes pattern="f00u09" slots="7" row="9" col="3"/>
+        <nodes pattern="f00u13" slots="7" row="9" col="4"/>
+        <nodes pattern="f00u17" slots="7" row="9" col="5"/>
+        <nodes pattern="f00u21" slots="7" row="9" col="6"/>
+        <nodes pattern="f00u25" slots="7" row="9" col="7"/>
+        <nodes pattern="f15u11" slots="7" row="9" col="9"/>
+        <nodes pattern="f15u15" slots="7" row="9" col="10"/>
+        <nodes pattern="f15u19" slots="7" row="9" col="11"/>
+        <nodes pattern="f15u23" slots="7" row="9" col="12"/>
+        <nodes pattern="f16u01" slots="7" row="9" col="14"/>
+        <nodes pattern="f16u05" slots="7" row="9" col="15"/>
+        <nodes pattern="f16u09" slots="7" row="9" col="16"/>
+        <nodes pattern="f16u13" slots="7" row="9" col="17"/>
+        <nodes pattern="f16u17" slots="7" row="9" col="18"/>
+        <nodes pattern="f16u21" slots="7" row="9" col="19"/>
+        <nodes pattern="f16u25" slots="7" row="9" col="20"/>
+        <nodes pattern="f16u29" slots="7" row="9" col="21"/>
+        <nodes pattern="f16u33" slots="4" row="9" col="22"/>
     </subset>
     <subset name="JFRC Compute Cluster - Legacy Grid">
-    
-        <nodes pattern="f00u01" slots="7" row="0" col="1"/>
-        <nodes pattern="f00u05" slots="7" row="0" col="2"/>
-        <nodes pattern="f00u09" slots="7" row="0" col="3"/>
-        <nodes pattern="f00u13" slots="7" row="0" col="4"/>
-        <nodes pattern="f00u17" slots="7" row="0" col="5"/>
-        <nodes pattern="f00u21" slots="7" row="0" col="6"/>
-        <nodes pattern="f00u25" slots="7" row="0" col="7"/>
-        <nodes pattern="f15u11" slots="7" row="0" col="9"/>
-        <nodes pattern="f15u15" slots="7" row="0" col="10"/>
-        <nodes pattern="f15u19" slots="7" row="0" col="11"/>
-        <nodes pattern="f15u23" slots="7" row="0" col="12"/>
-        
-        <nodes pattern="f16u01" slots="7" row="0" col="14"/>
-        <nodes pattern="f16u05" slots="7" row="0" col="15"/>
-        <nodes pattern="f16u09" slots="7" row="0" col="16"/>
-        <nodes pattern="f16u13" slots="7" row="0" col="17"/>
-        <nodes pattern="f16u17" slots="7" row="0" col="18"/>
-        <nodes pattern="f16u21" slots="7" row="0" col="19"/>
-        <nodes pattern="f16u25" slots="7" row="0" col="20"/>
-        <nodes pattern="f16u29" slots="7" row="0" col="21"/>
-        <nodes pattern="f16u33" slots="4" row="0" col="22"/>
-    
         <nodes pattern="f15u04a" slots="4" row="15" col="4"/>
         <nodes pattern="f15u04b" slots="2" row="15" col="5"/>
         <nodes pattern="f15u05a" slots="2" row="15" col="6"/>
         <nodes pattern="f15u05b" slots="2" row="15" col="7"/>
-        
         <nodes pattern="f(15)u0?(28|29|30|31)" slots="16"/>
-        
         <nodes pattern="f0*(\d+)u0*(\d+)" slots="8"/>
     </subset>
 </grid>
