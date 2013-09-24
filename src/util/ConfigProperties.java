@@ -70,9 +70,23 @@ public class ConfigProperties extends Properties {
         return getInteger(name, null);
     }
     
+    public static Long getLong(String name) {
+        return getLong(name, null);
+    }
+    
     public static Integer getInteger(String name, Integer defaultValue) {
         String s = getInstance().getProperty(name);
-        if (s==null) return defaultValue;
+        if (isEmpty(s)) return defaultValue;
         return Integer.valueOf(s);
+    }
+    
+    public static Long getLong(String name, Long defaultValue) {
+        String s = getInstance().getProperty(name);
+        if (isEmpty(s)) return defaultValue;
+        return Long.valueOf(s);
+    }
+    
+    private static boolean isEmpty(String s) {
+    	return s==null || s.trim().equals("");
     }
 }

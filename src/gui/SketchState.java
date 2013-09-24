@@ -202,8 +202,11 @@ public class SketchState implements Runnable {
     // Draw outlines for UI components?
     private boolean isDrawOutlines = ConfigProperties.getBoolean("derecho.viz.draw.outlines",false);
     
+    // Draw animations?
+    private boolean isDrawAnimations = ConfigProperties.getBoolean("derecho.viz.draw.animations",true);
+    
     // Should changes to sprites be tweened? This is usually disabled during buffering, for example.
-    private boolean tweenChanges = true;
+    private boolean tweenChanges = isDrawAnimations;
     
     // Should jobs have lasers to show their intended routes?
     private boolean isDrawLaserTracking = false;
@@ -432,9 +435,16 @@ public class SketchState implements Runnable {
         long elapsed = nextStartingPosition - totalElapsed;
 
         log.info("Buffering elapsed: {}",elapsed);
-        this.tweenChanges = false;
+        
+        if (isDrawAnimations) {
+        	this.tweenChanges = false;
+        }
+
         updateState(elapsed);
-        this.tweenChanges = true;
+
+        if (isDrawAnimations) {
+        	this.tweenChanges = true;
+        }
         
         // Get ready to start playing
         this.lastSliceRequestDate = new Date();

@@ -247,9 +247,15 @@ public class MySQLBasedStateLoader extends StateLoader {
                 }
 
                 String hard_request_name = rs.getString("hard_request_name");
-                if (hard_request_name!=null && "exclusive".equals(hard_request_name)) {
-                    job.setExclusive(true);
-                    job.setSlots(8);
+                if (hard_request_name!=null) {
+                	if ("exclusive".equals(hard_request_name)) {
+	                    job.setExclusive(true);
+	                    job.setSlots(8);
+                	}
+                	else if ("hadoop_exclusive".equals(hard_request_name)) {
+                		job.setExclusive(true);
+	                    job.setSlots(16);
+                	}
                 }
 
                 Integer nodeId = (Integer)rs.getObject("assigned_node_id");

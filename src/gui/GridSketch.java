@@ -80,6 +80,14 @@ public class GridSketch extends PApplet {
     private int currUserIndex = 0;
     private Long lastUserChange = 0L;
     
+    private String screenshotFile = ConfigProperties.getString("derecho.viz.screenshot.file", "screenshot.png");
+    private Long screenshotInterval = ConfigProperties.getLong("derecho.viz.screenshot.interval.secs");
+    private Long lastScreenshot = 0L;
+    
+    private boolean drawAnimations = ConfigProperties.getBoolean("derecho.viz.draw.animations", false);
+    private boolean drawFps = ConfigProperties.getBoolean("derecho.viz.draw.fps", true); 
+    private boolean drawControls = ConfigProperties.getBoolean("derecho.viz.draw.controls", true);
+    
     private List<String> subsets;
     private int currSubsetIndex = 0;
     
@@ -127,7 +135,10 @@ public class GridSketch extends PApplet {
             unregisterMethod("keyEvent", cp5.getWindow());
             
             cp5.setAutoDraw(false);
-            cp5.addFrameRate().setInterval(10).setPosition(1,1);
+            
+            if (drawFps) {
+            	cp5.addFrameRate().setInterval(10).setPosition(1,1);
+            }
             
             CColor sliderCColor = new CColor();
             sliderCColor.setBackground(sliderColor);
@@ -154,88 +165,98 @@ public class GridSketch extends PApplet {
                 .setVisible(false)
                 .setLabelVisible(false);
             
-            Group optionsGroup = cp5.addGroup("options")
-                    .setPosition(appWidth-300,10)
-                    .setWidth(300)
-                    .activateEvent(true)
-                    .setColorForeground(sliderBarColor)
-                    .setColorBackground(sliderBarColor)
-                    .setColorActive(controllerActiveColor)
-                    .setBackgroundColor(color(255,80))
-                    .setBackgroundHeight(90)
-                    .setLabel("Options")
-                    .close();
 
-            cp5.addCheckBox("setOptions")
-                .setPosition(10,10)
-                .setSize(20,9)
-                .addItem("Laser Tracking",0)
-                .addItem("Indicate Snapshots",1)
-                .addItem("Anonymize Users",2)
-                .setCaptionLabel("Mode")
-                .setColorBackground(sliderBarColor)
-                .setColorForeground(sliderBarColor)
-                .setColorActive(controllerActiveColor)
-                .setGroup(optionsGroup);
-
-            cp5.addRadioButton("setModes")
-                .setPosition(130,10)
-                .setSize(20,9)
-                .addItem("Normal",0)
-                .addItem("Highlight Users",1)
-                .addItem("Usage Heatmap",2)
-                .setNoneSelectedAllowed(false)
-                .activate(0)
-                .setCaptionLabel("Mode")
-                .setColorBackground(sliderBarColor)
-                .setColorForeground(sliderBarColor)
-                .setColorActive(controllerActiveColor)
-                .setGroup(optionsGroup);
-            
-            cp5.addSlider("setPlaySpeed")
-                .setPosition(10,50)
-                .setSize(180,9)
-                .setValue(playSpeed)
-                .setRange(1, 50)
-                .setDecimalPrecision(0)
-                .setCaptionLabel("Play Speed (1x-40x)")
-                .setColorBackground(sliderBarColor)
-                .setColorForeground(controllerActiveColor)
-                .setColorActive(controllerActiveColor)
-                .setGroup(optionsGroup);
-
-            cp5.addButton("setIsLive")
-                .setSwitch(true)
-                .setPosition(10,65)
-                .setSize(24,12)
-                .setCaptionLabel("LIVE")
-                .setColorBackground(sliderBarColor)
-                .setColorForeground(sliderBarColor)
-                .setColorActive(controllerActiveColor)
-                .setGroup(optionsGroup);
-
-            cp5.addButton("setSummary")
-                .setSwitch(true)
-                .setPosition(40,65)
-                .setSize(50,12)
-                .setCaptionLabel("Summary")
-                .setColorBackground(sliderBarColor)
-                .setColorForeground(sliderBarColor)
-                .setColorActive(controllerActiveColor)
-                .setGroup(optionsGroup);
-            
-            cp5.addButton("exitSketch")
-                .setPosition(260,10)
-                .setSize(24,12)
-                .setCaptionLabel("Exit")
-                .setColorBackground(sliderBarColor)
-                .setColorForeground(sliderBarColor)
-                .setColorActive(controllerActiveColor)
-                .setGroup(optionsGroup);
+            if (drawControls) {
+	            Group optionsGroup = cp5.addGroup("options")
+	                    .setPosition(appWidth-300,10)
+	                    .setWidth(300)
+	                    .activateEvent(true)
+	                    .setColorForeground(sliderBarColor)
+	                    .setColorBackground(sliderBarColor)
+	                    .setColorActive(controllerActiveColor)
+	                    .setBackgroundColor(color(255,80))
+	                    .setBackgroundHeight(90)
+	                    .setLabel("Options")
+	                    .close();
+	
+	            cp5.addCheckBox("setOptions")
+	                .setPosition(10,10)
+	                .setSize(20,9)
+	                .addItem("Laser Tracking",0)
+	                .addItem("Indicate Snapshots",1)
+	                .addItem("Anonymize Users",2)
+	                .setCaptionLabel("Mode")
+	                .setColorBackground(sliderBarColor)
+	                .setColorForeground(sliderBarColor)
+	                .setColorActive(controllerActiveColor)
+	                .setGroup(optionsGroup);
+	
+	            cp5.addRadioButton("setModes")
+	                .setPosition(130,10)
+	                .setSize(20,9)
+	                .addItem("Normal",0)
+	                .addItem("Highlight Users",1)
+	                .addItem("Usage Heatmap",2)
+	                .setNoneSelectedAllowed(false)
+	                .activate(0)
+	                .setCaptionLabel("Mode")
+	                .setColorBackground(sliderBarColor)
+	                .setColorForeground(sliderBarColor)
+	                .setColorActive(controllerActiveColor)
+	                .setGroup(optionsGroup);
+	            
+	            cp5.addSlider("setPlaySpeed")
+	                .setPosition(10,50)
+	                .setSize(180,9)
+	                .setValue(playSpeed)
+	                .setRange(1, 50)
+	                .setDecimalPrecision(0)
+	                .setCaptionLabel("Play Speed (1x-40x)")
+	                .setColorBackground(sliderBarColor)
+	                .setColorForeground(controllerActiveColor)
+	                .setColorActive(controllerActiveColor)
+	                .setGroup(optionsGroup);
+	
+	            cp5.addButton("setIsLive")
+	                .setSwitch(true)
+	                .setPosition(10,65)
+	                .setSize(24,12)
+	                .setCaptionLabel("LIVE")
+	                .setColorBackground(sliderBarColor)
+	                .setColorForeground(sliderBarColor)
+	                .setColorActive(controllerActiveColor)
+	                .setGroup(optionsGroup);
+	
+	            cp5.addButton("setSummary")
+	                .setSwitch(true)
+	                .setPosition(40,65)
+	                .setSize(50,12)
+	                .setCaptionLabel("Summary")
+	                .setColorBackground(sliderBarColor)
+	                .setColorForeground(sliderBarColor)
+	                .setColorActive(controllerActiveColor)
+	                .setGroup(optionsGroup);
+	            
+	            cp5.addButton("exitSketch")
+	                .setPosition(260,10)
+	                .setSize(24,12)
+	                .setCaptionLabel("Exit")
+	                .setColorBackground(sliderBarColor)
+	                .setColorForeground(sliderBarColor)
+	                .setColorActive(controllerActiveColor)
+	                .setGroup(optionsGroup);
+            }
             
             if (isLive) goLive();
             
             log.info("setup() complete");
+            
+            log.info("screenshotInterval: "+screenshotInterval);
+            log.info("screenshotFile: "+screenshotFile);
+            log.info("drawAnimations: "+drawAnimations);
+            log.info("drawControls: "+drawControls);
+            log.info("drawFps: "+drawFps);
+            
         }
         catch (Throwable e) {
             log.error("Initialization error",e);
@@ -343,7 +364,7 @@ public class GridSketch extends PApplet {
                 if (TIMER) stopWatch.lap("drawMainBuffer");
 
                 // Draw the UI
-                cp5.draw();
+            	cp5.draw();	
                 
                 if (TIMER) stopWatch.lap("drawUI");
 
@@ -392,6 +413,13 @@ public class GridSketch extends PApplet {
             }
             
             if (TIMER) stopWatch.stop("draw");
+            
+            if (screenshotInterval!=null && lastScreenshot!=null && System.currentTimeMillis()-lastScreenshot>screenshotInterval*1000) {
+	            saveFrame(screenshotFile);
+	            lastScreenshot = System.currentTimeMillis();
+	            if (TIMER) stopWatch.stop("screenshot");
+            }
+            
         }
         catch (Exception e) {
             log.error("Error while drawing",e);
@@ -567,22 +595,26 @@ public class GridSketch extends PApplet {
         this.playSpeed = 1.0f;
         sketchState.setPlaySpeed(playSpeed);
         Slider slider = (Slider)cp5.getController("setPlaySpeed");
-        slider.changeValue(1.0f);
+        if (slider!=null) slider.changeValue(1.0f);
 
         Button summaryButton = (Button)cp5.getController("setSummary");
-        if (!summaryButton.isOn() && isSummary) {
-            summaryButton.setOn();
-        }
-        else if (summaryButton.isOn() && !isSummary) {
-            summaryButton.setOff();
-        }
-        else {
-            sketchState.setSummaryMode(isSummary);
+        if (summaryButton!=null) {
+	        if (!summaryButton.isOn() && isSummary) {
+	            summaryButton.setOn();
+	        }
+	        else if (summaryButton.isOn() && !isSummary) {
+	            summaryButton.setOff();
+	        }
+	        else {
+	            sketchState.setSummaryMode(isSummary);
+	        }
         }
         
         Button isLiveButton = (Button)cp5.getController("setIsLive");
-        if (!isLiveButton.isOn()) {
-            isLiveButton.setOn();
+        if (isLiveButton!=null) {
+	        if (!isLiveButton.isOn()) {
+	            isLiveButton.setOn();
+	        }
         }
 
         log.info("Going live...");
@@ -623,7 +655,7 @@ public class GridSketch extends PApplet {
     }
 
     private void goDead() {
-        
+
         this.isLive = false;
         log.info("Going dead...");
         Button button = (Button)cp5.getController("setIsLive");
