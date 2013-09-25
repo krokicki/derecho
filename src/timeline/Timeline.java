@@ -215,8 +215,8 @@ public class Timeline {
             log.debug("Applying {} events",snapshotEventMap.size());
             for(Long offset : snapshotEventMap.keySet()) {
                 for(Event event : snapshotEventMap.get(offset)) {
-                	if (event instanceof GridEvent) {
-                		GridEvent gridEvent = (GridEvent)event;
+                    if (event instanceof GridEvent) {
+                        GridEvent gridEvent = (GridEvent)event;
                         log.debug("Apply event: {}",gridEvent);
                         if (!loadState.applyEvent(gridEvent)) {
                             errorsDetected++;
@@ -225,8 +225,8 @@ public class Timeline {
                         setNumRunningJobs(event.getOffset(),loadState.getNumRunningJobs());
                         setNumQueuedJobs(event.getOffset(),loadState.getNumQueuedJobs());
                         prevSnapshotOffset = event.getOffset();
-                	}
-                	 
+                    }
+                     
                 }
             }
 
@@ -244,8 +244,8 @@ public class Timeline {
             }
         }
         
-        
-        printEventMap();
+
+        if (log.isDebugEnabled()) printEventMap();
 //      
 //      GridState snapshotState = new GridState(snapshot,"Snapshot");
 //      
@@ -258,13 +258,13 @@ public class Timeline {
     }
     
     private synchronized boolean addEvent(Event event) {
-    	if (event instanceof GridEvent) {
-    		GridEvent gridEvent = (GridEvent)event;
-	        if (eventCache.containsKey(gridEvent.getCacheKey())) {
-	            return false;
-	        }
-	        eventCache.put(gridEvent.getCacheKey(), event.getOffset());
-    	}
+        if (event instanceof GridEvent) {
+            GridEvent gridEvent = (GridEvent)event;
+            if (eventCache.containsKey(gridEvent.getCacheKey())) {
+                return false;
+            }
+            eventCache.put(gridEvent.getCacheKey(), event.getOffset());
+        }
         
         List<Event> events = eventMap.get(event.getOffset());
         if (events==null) {
@@ -365,30 +365,30 @@ public class Timeline {
     }
     
     public void printEventMap() {
-        log.info("Current Timeline:");
+        log.debug("Current Timeline:");
         for(Long offset : eventMap.keySet()) {
             List<Event> events = eventMap.get(offset);
             for(Event event : events) {
-            	if (event instanceof GridEvent) {
-            		GridEvent gridEvent = (GridEvent)event;
-                    log.info(padRight(""+event.getOffset(), 10)+" "+gridEvent.getCacheKey());
-            	}
-            	else if (event instanceof SnapshotEvent) {
-                    log.info(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---");	
-            	}
-            	else {
-            		log.error("Unknown event class: {}",event.getClass().getName());
-            	}
+                if (event instanceof GridEvent) {
+                    GridEvent gridEvent = (GridEvent)event;
+                    log.debug(padRight(""+event.getOffset(), 10)+" "+gridEvent.getCacheKey());
+                }
+                else if (event instanceof SnapshotEvent) {
+                    log.debug(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---"); 
+                }
+                else {
+                    log.error("Unknown event class: {}",event.getClass().getName());
+                }
             }
         }
         
-	}
+    }
 
-	public static String padRight(String s, int n) {
-		return String.format("%1$-" + n + "s", s);
-	}
+    public static String padRight(String s, int n) {
+        return String.format("%1$-" + n + "s", s);
+    }
 
-	public static String padLeft(String s, int n) {
-		return String.format("%1$" + n + "s", s);
-	}
+    public static String padLeft(String s, int n) {
+        return String.format("%1$" + n + "s", s);
+    }
 }
