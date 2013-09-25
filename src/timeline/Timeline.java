@@ -43,7 +43,7 @@ public class Timeline {
     private Snapshot penultimateSnapshot;
     private Snapshot ultimateSnapshot;
     private LinkedBlockingDeque<Snapshot> snapshots = new LinkedBlockingDeque<Snapshot>();
-    private ConcurrentSkipListMap<Long,List<GridEvent>> eventMap = new ConcurrentSkipListMap<Long,List<GridEvent>>();
+    private ConcurrentSkipListMap<Long,List<Event>> eventMap = new ConcurrentSkipListMap<Long,List<Event>>();
     private Date firstSnapshotDate;
     private Date lastSnapshotDate;
     
@@ -53,7 +53,7 @@ public class Timeline {
     
     // State machine for loading
     private GridState loadState;
-    private ConcurrentSkipListMap<Long,List<GridEvent>> snapshotEventMap = new ConcurrentSkipListMap<Long,List<GridEvent>>();
+    private ConcurrentSkipListMap<Long,List<Event>> snapshotEventMap = new ConcurrentSkipListMap<Long,List<Event>>();
     private LRUCache<String,Long> eventCache = new LRUCache<String,Long>(100000);
     private Integer numRunningJobs = null;
     private Integer numQueuedJobs = null;
@@ -206,6 +206,7 @@ public class Timeline {
             }
         }
         
+        addEvent(new SnapshotEvent(snapshotOffset));
         
         // Apply the events to the state
         synchronized(this) {
@@ -213,15 +214,19 @@ public class Timeline {
             int errorsDetected = 0;
             log.debug("Applying {} events",snapshotEventMap.size());
             for(Long offset : snapshotEventMap.keySet()) {
-                for(GridEvent event : snapshotEventMap.get(offset)) {
-                    log.debug("Apply event: {}",event);
-                    if (!loadState.applyEvent(event)) {
-                        errorsDetected++;
-                        log.error("ERROR APPLYING EVENT "+event);
-                    }
-                    setNumRunningJobs(event.getOffset(),loadState.getNumRunningJobs());
-                    setNumQueuedJobs(event.getOffset(),loadState.getNumQueuedJobs());
-                    prevSnapshotOffset = event.getOffset(); 
+                for(Event event : snapshotEventMap.get(offset)) {
+                	if (event instanceof GridEvent) {
+                		GridEvent gridEvent = (GridEvent)event;
+                        log.debug("Apply event: {}",gridEvent);
+                        if (!loadState.applyEvent(gridEvent)) {
+                            errorsDetected++;
+                            log.error("Error applying event: {}",gridEvent);
+                        }
+                        setNumRunningJobs(event.getOffset(),loadState.getNumRunningJobs());
+                        setNumQueuedJobs(event.getOffset(),loadState.getNumQueuedJobs());
+                        prevSnapshotOffset = event.getOffset();
+                	}
+                	 
                 }
             }
 
@@ -240,7 +245,7 @@ public class Timeline {
         }
         
         
-//      printEventMap();
+        printEventMap();
 //      
 //      GridState snapshotState = new GridState(snapshot,"Snapshot");
 //      
@@ -252,22 +257,25 @@ public class Timeline {
         prevSnapshotOffset = snapshotOffset;
     }
     
-    private synchronized boolean addEvent(GridEvent event) {
-        if (eventCache.containsKey(event.getCacheKey())) {
-            return false;
-        }
-        eventCache.put(event.getCacheKey(), event.getOffset());
+    private synchronized boolean addEvent(Event event) {
+    	if (event instanceof GridEvent) {
+    		GridEvent gridEvent = (GridEvent)event;
+	        if (eventCache.containsKey(gridEvent.getCacheKey())) {
+	            return false;
+	        }
+	        eventCache.put(gridEvent.getCacheKey(), event.getOffset());
+    	}
         
-        List<GridEvent> events = eventMap.get(event.getOffset());
+        List<Event> events = eventMap.get(event.getOffset());
         if (events==null) {
-            events = new ArrayList<GridEvent>();
+            events = new ArrayList<Event>();
             eventMap.put(event.getOffset(), events);
         }
         events.add(event);
         
-        List<GridEvent> snapshotEvents = snapshotEventMap.get(event.getOffset());
+        List<Event> snapshotEvents = snapshotEventMap.get(event.getOffset());
         if (snapshotEvents==null) {
-            snapshotEvents = Collections.synchronizedList(new ArrayList<GridEvent>());
+            snapshotEvents = Collections.synchronizedList(new ArrayList<Event>());
             snapshotEventMap.put(event.getOffset(), snapshotEvents);
         }
         snapshotEvents.add(event);
@@ -336,7 +344,7 @@ public class Timeline {
         return getFirstOffset()+getLength();
     }
     
-    public synchronized SortedMap<Long,List<GridEvent>> getEvents() {
+    public synchronized SortedMap<Long,List<Event>> getEvents() {
         return ImmutableSortedMap.copyOf(eventMap);
     }
     
@@ -357,20 +365,30 @@ public class Timeline {
     }
     
     public void printEventMap() {
-        LinkedList<Snapshot> snapshotQueue = new LinkedList<Snapshot>(getSnapshots());
-        Snapshot nextSnapshot = snapshotQueue.pop();
         log.info("Current Timeline:");
         for(Long offset : eventMap.keySet()) {
-            List<GridEvent> events = eventMap.get(offset);
-            for(GridEvent event : events) {
-                long ssOffset = nextSnapshot==null?Long.MAX_VALUE:getOffset(nextSnapshot.getSamplingTime());
-                if (event.getOffset()>ssOffset) {
-                    nextSnapshot = (snapshotQueue!=null&&!snapshotQueue.isEmpty())?snapshotQueue.pop():null;
-                    log.info(ssOffset+"\t"+"SNAPSHOT");
-                }
-                log.info(event.getOffset()+"\t"+event.getCacheKey());
+            List<Event> events = eventMap.get(offset);
+            for(Event event : events) {
+            	if (event instanceof GridEvent) {
+            		GridEvent gridEvent = (GridEvent)event;
+                    log.info(padRight(""+event.getOffset(), 10)+" "+gridEvent.getCacheKey());
+            	}
+            	else if (event instanceof SnapshotEvent) {
+                    log.info(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---");	
+            	}
+            	else {
+            		log.error("Unknown event class: {}",event.getClass().getName());
+            	}
             }
         }
         
-    }
+	}
+
+	public static String padRight(String s, int n) {
+		return String.format("%1$-" + n + "s", s);
+	}
+
+	public static String padLeft(String s, int n) {
+		return String.format("%1$" + n + "s", s);
+	}
 }

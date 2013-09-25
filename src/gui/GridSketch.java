@@ -657,7 +657,7 @@ public class GridSketch extends PApplet {
     private void goDead() {
 
         this.isLive = false;
-        log.info("Going dead...");
+        log.debug("Going dead...");
         Button button = (Button)cp5.getController("setIsLive");
         if (button!=null && button.isOn()) {
             button.setOff();

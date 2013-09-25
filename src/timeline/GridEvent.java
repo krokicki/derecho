@@ -7,7 +7,7 @@ import snapshot.SnapshotJob;
  * 
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
-public class GridEvent {
+public class GridEvent extends Event {
 
     public static enum EventType {
         SUB,
@@ -15,34 +15,25 @@ public class GridEvent {
         END
     }
     
-    private Long offset;
     private EventType type;
     private String fullJobId;
     private SnapshotJob ssJob;
     
     public GridEvent(EventType type, Long offset, String fullJobId) {
+    	super(offset);
         this.type = type;
-        this.offset = offset;
         this.fullJobId = fullJobId;
     }
     
     public GridEvent(EventType type, Long offset, SnapshotJob ssJob) {
-        this.type = type;
-        this.offset = offset;
+    	super(offset);
+    	this.type = type;
         this.ssJob = ssJob;
         this.fullJobId = ssJob.getFullJobId();
     }
     
     public EventType getType() {
         return type;
-    }
-
-    public Long getOffset() {
-        return offset;
-    }
-
-    public void setOffset(Long offset) {
-        this.offset = offset;
     }
 
     public String getJobId() {
@@ -55,7 +46,7 @@ public class GridEvent {
 
     public void print() {
         StringBuffer buf = new StringBuffer();
-        buf.append(offset);
+        buf.append(getOffset());
         buf.append("\t");
         buf.append(type.toString());
         buf.append("\t");
@@ -74,7 +65,7 @@ public class GridEvent {
 
     @Override
     public String toString() {
-        return "GridEvent [fullJobId=" + fullJobId + ", offset=" + offset
+        return "GridEvent [fullJobId=" + fullJobId + ", offset=" + getOffset()
                 + ", ssJob=" + ssJob + ", type=" + type + "]";
     }
     

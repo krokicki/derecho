@@ -43,6 +43,9 @@ public class SketchState implements Runnable {
 
     private static final int SLOTS_PER_ROW = 4;
     
+    // Resync with passing snapshot events? 
+    private static final boolean RESYNC = false;
+    
     // Timing
     private static final float DURATION_JOB_SUB = 40.0f;
     private static final float DURATION_JOB_START = 20.0f;
@@ -436,15 +439,10 @@ public class SketchState implements Runnable {
 
         log.info("Buffering elapsed: {}",elapsed);
         
-        if (isDrawAnimations) {
-        	this.tweenChanges = false;
-        }
-
+        // Replay the events which happened between the snapshot position and the desired starting position
+        if (isDrawAnimations) this.tweenChanges = false;
         updateState(elapsed);
-
-        if (isDrawAnimations) {
-        	this.tweenChanges = true;
-        }
+        if (isDrawAnimations) this.tweenChanges = true;
         
         // Get ready to start playing
         this.lastSliceRequestDate = new Date();
@@ -859,22 +857,57 @@ public class SketchState implements Runnable {
             return slice;
         }
         
-        SortedMap<Long,List<GridEvent>> eventSlice = timeline.getEvents().subMap(prevElapsed, totalElapsed);
+        SortedMap<Long,List<Event>> eventSlice = timeline.getEvents().subMap(prevElapsed, totalElapsed);
         
         log.trace("getNextSlice, eventSlice.size={}",eventSlice.size());
+
+        Long resyncSnapshotOffset = null;
+        List<GridEvent> postSyncEvents = new ArrayList<GridEvent>(); 
         
-        for(Long offset : eventSlice.keySet()) {
-            List<GridEvent> events = eventSlice.get(offset);
-            for(GridEvent event : events) {
-                if (event.getOffset()>=totalElapsed) {
-                    break;
+        if (RESYNC) {
+        	// Check if there is a SnapshotEvent in this slice that we need to resync with
+	        for(Long offset : eventSlice.keySet()) {
+	            List<Event> events = eventSlice.get(offset);
+	            for(Event event : events) {
+	            	if (event instanceof SnapshotEvent) {
+	            		// This slice has a snapshot transition, let's resync the model entirely to the snapshot and then replay the remaining events.
+	            		SnapshotEvent ssEvent = (SnapshotEvent)event;
+	            		resyncSnapshotOffset = ssEvent.getOffset();
+	            	}
+	            	else if (event instanceof GridEvent) {
+	            		if (resyncSnapshotOffset!=null) {
+	            			postSyncEvents.add((GridEvent)event);
+	            		}
+	            	}
+	            }
+	        }
+        }
+        
+        if (RESYNC && resyncSnapshotOffset!=null) {
+        	resyncState(resyncSnapshotOffset, postSyncEvents);
+        }
+        else {
+            for(Long offset : eventSlice.keySet()) {
+                List<Event> events = eventSlice.get(offset);
+                for(Event event : events) {
+                	if (event instanceof GridEvent) {
+                		GridEvent gridEvent = (GridEvent)event;
+    	                if (gridEvent.getOffset()>=totalElapsed) {
+    	                    break;
+    	                }
+    	                log.trace("getNextSlice\t{}\t{}",gridEvent.getOffset(),gridEvent.getCacheKey());
+    	                slice.add(gridEvent);
+                	}
                 }
-                log.trace("getNextSlice\t{}\t{}",event.getOffset(),event.getCacheKey());
-                slice.add(event);
             }
         }
         
         return slice;
+    }
+    
+    private void resyncState(long snapshotOffset, List<GridEvent> postSyncEvents) {
+    	nextStartingPosition = postSyncEvents.get(postSyncEvents.size()-1).getOffset();
+    	// TODO: ensure we are synchronized with snapshotOffset + postSyncEvents
     }
     
     private void applyEvent(GridEvent event) {
