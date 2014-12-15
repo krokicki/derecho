@@ -15,8 +15,8 @@
   <logger name="snapshot" level="INFO"/>
   
   <logger name="timeline" level="INFO"/>
-  <logger name="timeline.Timeline" level="ERROR"/>
-  <logger name="timeline.GridState" level="ERROR"/>
+  <logger name="timeline.Timeline" level="INFO"/>
+  <logger name="timeline.GridState" level="INFO"/>
   
   <logger name="gui" level="INFO"/>
   <logger name="gui.SketchState" level="INFO"/>
