@@ -54,7 +54,7 @@ public class MySQLBasedStateLoader extends StateLoader {
 //        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time >= now() - INTERVAL 30 MINUTE order by poll_date_time");
 //        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time >= now() - INTERVAL 6 HOUR order by poll_date_time");
 //        loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2012/12/20' and '2012/12/21' order by poll_date_time");
-//      loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/02/08 22:00:00' and '2013/02/08 23:00:00' order by poll_date_time"); // for out of slot fix
+//        return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2014/12/12 12:00:00' and '2014/12/12 12:30:00' order by poll_date_time"); // for parallel parent job fix
     }
     
     public boolean loadInitial(String sql) throws Exception {
@@ -156,9 +156,7 @@ public class MySQLBasedStateLoader extends StateLoader {
     
     public Snapshot loadSnapshot(Timestamp snapshotDate) throws Exception {
         
-        Snapshot snapshot = new Snapshot();
-        snapshot.setSamplingTime(snapshotDate);
-        
+        Snapshot snapshot = new Snapshot(snapshotDate);
         Map<String,SnapshotNode> nodeNameMap = new HashMap<String,SnapshotNode>();
         Map<Integer, String> nodeIdToNameMap = new HashMap<Integer, String>();
         
@@ -205,7 +203,7 @@ public class MySQLBasedStateLoader extends StateLoader {
             rs = stmt.executeQuery();
 
             log.debug("got snapshotDate: "+snapshotDate);
-            
+                        
             while (rs.next()) {
 
                 SnapshotJob job = new SnapshotJob();
@@ -288,6 +286,7 @@ public class MySQLBasedStateLoader extends StateLoader {
         }
 
         snapshotDates.add(snapshotDate);
+        snapshot.init();
         timeline.addSnapshot(snapshot);
         return snapshot;
     }

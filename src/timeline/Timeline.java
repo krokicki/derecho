@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -100,6 +99,8 @@ public class Timeline {
         log.debug("---------------------------------------------------------------------");
         log.info("Adding snapshot with offset={}",snapshotOffset);
 
+        Map<Integer,Date> parallelJobStarts = snapshot.getParallelJobStarts();
+
         // Compute a set of relevant job ids in this snapshot
         Set<String> ssJobIds = new HashSet<String>();
         for(SnapshotNode node : snapshot.getNodes()) {          
@@ -111,33 +112,24 @@ public class Timeline {
             ssJobIds.add(ssJob.getFullJobId());
         }
         
-        // Check all known jobs, and generate delete events for the ones that are
-        // no longer relevant. 
-        List<String> jobsToErase = new ArrayList<String>();
+        // Check all known jobs, and generate delete events for the ones that are no longer relevant. 
         for(GridJob stateJob : loadState.getJobMap().values()) {
+            String fullJobId = stateJob.getFullJobId();
             if (!ssJobIds.contains(stateJob.getFullJobId())) { 
+                // Assume the job ended right after the last snapshot
                 long endOffset = prevSnapshotOffset+1;
-                if (prevSnapshotOffset==0) {
-                    // Job ends before the timeline starts, so let's delete it entirely
-                    log.trace("    "+stateJob+" (known) ended at "+endOffset+" (event occurs before timeline)");
-                    jobsToErase.add(stateJob.getFullJobId());
+                // Parallel queued jobs end when the parallel jobs start
+                if (parallelJobStarts.containsKey(stateJob.getJobId())) {
+                    endOffset = getOffset(parallelJobStarts.get(stateJob.getJobId()));
                 }
-                else {
-                    boolean e1 = addEvent(new GridEvent(EventType.END, endOffset, stateJob.getFullJobId()));
-                    if (e1) {
-                        log.trace("    "+stateJob+" (known) ended at "+endOffset);
-                    }
+                boolean e1 = addEvent(new GridEvent(EventType.END, endOffset, stateJob.getFullJobId()));
+                if (e1) {
+                    log.debug("    "+stateJob+" (known) ended at "+endOffset);
                 }
             }
-        }       
-        
-        // Note: have to remove it from the run state as well, if we're running already. Oy!
-        for(String fullJobId : jobsToErase) {
-            for(Snapshot s : snapshots) {
-                s.eraseJob(fullJobId);
-            }
-            loadState.eraseJob(fullJobId);
         }
+
+        log.trace("Generating start events for running jobs...");
         
         for(SnapshotNode node : snapshot.getNodes()) {          
             for(SnapshotJob ssJob : node.getJobs()) {
@@ -157,10 +149,10 @@ public class Timeline {
                         boolean e1 = addEvent(new GridEvent(EventType.SUB, queueOffset, ssJob));
                         boolean e2 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));  
                         if (e1) {
-                            log.trace("    "+ssJob+" (new) subbed at "+queueOffset);    
+                            log.debug("    "+ssJob+" (new) subbed at "+queueOffset);    
                         }
                         if (e2) {
-                            log.trace("    "+ssJob+" (new) started at "+startOffset);
+                            log.debug("    "+ssJob+" (new) started at "+startOffset);
                         }
                     }
                     else {
@@ -176,12 +168,14 @@ public class Timeline {
                         if (startOffset>snapshotOffset) startOffset=snapshotOffset;
                         boolean e1 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));
                         if (e1) {
-                            log.trace("    "+ssJob+" (known) started at "+startOffset); 
+                            log.debug("    "+ssJob+" (known) started at "+startOffset); 
                         }
                     }
                 }
             }
         }
+
+        log.trace("Generating sub events for queued jobs...");
         
         for(SnapshotJob ssJob : snapshot.getQueuedJobs()) {
 
@@ -201,12 +195,14 @@ public class Timeline {
                 if (subOffset>snapshotOffset) subOffset=snapshotOffset;
                 boolean e1 = addEvent(new GridEvent(EventType.SUB, subOffset, ssJob));
                 if (e1) {
-                    log.trace("    "+ssJob+" (new) subbed at "+subOffset);  
+                    log.debug("    "+ssJob+" (new) subbed at "+subOffset);  
                 }
             }
         }
         
         addEvent(new SnapshotEvent(snapshotOffset));
+
+        log.trace("Will apply events to state..");
         
         // Apply the events to the state
         synchronized(this) {
@@ -217,7 +213,7 @@ public class Timeline {
                 for(Event event : snapshotEventMap.get(offset)) {
                     if (event instanceof GridEvent) {
                         GridEvent gridEvent = (GridEvent)event;
-                        log.debug("Apply event: {}",gridEvent);
+                        log.trace("Apply event: {}",gridEvent);
                         if (!loadState.applyEvent(gridEvent)) {
                             errorsDetected++;
                             log.error("Error applying event: {}",gridEvent);
@@ -245,7 +241,7 @@ public class Timeline {
         }
         
 
-        if (log.isDebugEnabled()) printEventMap();
+        if (log.isTraceEnabled()) printEventMap();
 //      
 //      GridState snapshotState = new GridState(snapshot,"Snapshot");
 //      
@@ -365,16 +361,16 @@ public class Timeline {
     }
     
     public void printEventMap() {
-        log.debug("Current Timeline:");
+        log.trace("Current Timeline:");
         for(Long offset : eventMap.keySet()) {
             List<Event> events = eventMap.get(offset);
             for(Event event : events) {
                 if (event instanceof GridEvent) {
                     GridEvent gridEvent = (GridEvent)event;
-                    log.debug(padRight(""+event.getOffset(), 10)+" "+gridEvent.getCacheKey());
+                    log.trace(padRight(""+event.getOffset(), 10)+" "+gridEvent.getCacheKey());
                 }
                 else if (event instanceof SnapshotEvent) {
-                    log.debug(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---"); 
+                    log.trace(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---"); 
                 }
                 else {
                     log.error("Unknown event class: {}",event.getClass().getName());

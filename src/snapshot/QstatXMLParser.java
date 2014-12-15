@@ -30,19 +30,18 @@ public class QstatXMLParser {
     
     public Snapshot loadFromFile(String filename) throws Exception {
         
-        Snapshot snapshot = new Snapshot();
-        
+        Date samplingTime = null;
         File file = new File(filename);
         String ts = file.getName();
         ts = ts.substring(ts.indexOf('-')+1,ts.indexOf('.'));
         try {
-            Date st = fileDateFormat.parse(ts);
-            snapshot.setSamplingTime(st);
+            samplingTime = fileDateFormat.parse(ts);
         }
         catch (ParseException e) {
             System.out.println("Could not parse date from filename: "+file.getName());
         }
-
+        
+        Snapshot snapshot = new Snapshot(samplingTime);
         SAXReader reader = new SAXReader();
         Document doc = reader.read(file);
         Element root = doc.getRootElement();

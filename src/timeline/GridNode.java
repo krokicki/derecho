@@ -1,7 +1,9 @@
 package timeline;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +32,7 @@ public class GridNode {
     public List<Integer> assignJobToSlots(GridJob job) {
         List<Integer> indexes = new ArrayList<Integer>();
         int slotsLeft = job.getSlots();
+        Set<String> running = new HashSet<String>();
         for(int s=0; s<slots.length && slotsLeft>0; s++) {
             if (slots[s]==null) {
                 slots[s] = job;
@@ -38,10 +41,13 @@ public class GridNode {
                 // If any slots were assigned, then lets consider the job on the node, and hope all slots were assigned.
                 job.setNode(this);
             }
+            else {
+                running.add(job.getFullJobId());
+            }
         }
         if (slotsLeft>0) {
             log.debug("Node state: {}",this);
-            log.error("Node "+shortName+" cannot allocate "+slotsLeft+" slots for "+job.getFullJobId());
+            log.error("Node "+shortName+" cannot allocate "+slotsLeft+" slots for "+job.getFullJobId()+" because other jobs are running: ["+running+"]");
         }
         return indexes;
     }

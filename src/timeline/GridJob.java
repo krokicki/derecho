@@ -39,6 +39,10 @@ public class GridJob {
         this.startTime = job.getStartTime();
     }
     
+    public int getJobId() {
+        return jobId;
+    }
+
     public String getFullJobId() {
         StringBuilder s = new StringBuilder();
         s.append(jobId);

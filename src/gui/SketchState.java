@@ -403,7 +403,7 @@ public class SketchState implements Runnable {
         for(Snapshot snapshot : timeline.getSnapshots()) {
             long offset = timeline.getOffset(snapshot.getSamplingTime());
             
-            log.info("Snapshot {} has offset {}",i,offset);
+            log.debug("Snapshot {} has offset {}",i,offset);
             
             if (offset>=nextStartingPosition) {
                 if (prevSnapshot==null) {

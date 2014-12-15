@@ -92,14 +92,25 @@ public class GridConfig {
     public NodeConfiguration getConfiguration(String nodeShortName) {
     	
     	for(NodeSubSet nodeSubSet : subsets.values()) {
-    		for(NodeSet nodeSet : nodeSubSet.getNodeSets()) {
+    	    
+    	    // Reverse the node set list so that the last matching definition is applied to the node
+    	    List<NodeSet> nodeSets = new ArrayList<NodeSet>(nodeSubSet.getNodeSets());
+    	    Collections.reverse(nodeSets);
+    		
+    	    for(NodeSet nodeSet : nodeSets) {
                 Pattern p = Pattern.compile(nodeSet.getPattern());
                 Matcher m = p.matcher(nodeShortName);
                 if (m.matches()) {
                 	int i = 0;
-                	Integer row = nodeSet.getRow()!=null ? nodeSet.getRow() : Integer.parseInt(m.group(++i));
-                	Integer col = nodeSet.getCol()!=null ? nodeSet.getCol() : Integer.parseInt(m.group(++i));
-                	return new NodeConfiguration(nodeShortName, nodeSet, row, col);
+                	try {
+                    	Integer row = nodeSet.getRow()!=null ? nodeSet.getRow() : Integer.parseInt(m.group(++i));
+                    	Integer col = nodeSet.getCol()!=null ? nodeSet.getCol() : Integer.parseInt(m.group(++i));
+                    	return new NodeConfiguration(nodeShortName, nodeSet, row, col);
+                	}
+                	catch (Exception e) {
+                	    log.error("Cannot parse configuration for "+nodeSet.getPattern(), e);
+                	    return null;
+                	}
                 }
     		}
     	}
