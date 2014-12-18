@@ -11,7 +11,7 @@ Each node set (<nodes>) must define a row and column position in one of two ways
 A node may match multiple node sets, but only the last matching definition in the first matching subset will be used. 
 
 -->
-    <subset name="JFRC Compute Cluster">
+    <subset name="Janelia Compute Cluster">
         
         <nodes pattern="h(\d+)u(\d+)" slots="16"/>
         
@@ -43,7 +43,7 @@ A node may match multiple node sets, but only the last matching definition in th
         <nodes pattern="f16u35" slots="16" row="10" col="24"/>
         
     </subset>
-    <subset name="JFRC Compute Cluster - Legacy Grid">
+    <subset name="Janelia Legacy Cluster">
     
         <nodes pattern="f0*(\d+)u0*(\d+)" slots="8"/>
         
