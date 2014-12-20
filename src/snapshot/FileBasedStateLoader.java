@@ -47,7 +47,7 @@ public class FileBasedStateLoader extends StateLoader {
         }
         
         log.debug("Loaded {} snapshots",timeline.getSnapshots().size());
-        return true;
+        return !timeline.getSnapshots().isEmpty();
     }
     
     public boolean loadNextSnapshot() throws Exception {

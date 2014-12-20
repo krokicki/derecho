@@ -41,13 +41,18 @@ public class GridNode {
                 // If any slots were assigned, then lets consider the job on the node, and hope all slots were assigned.
                 job.setNode(this);
             }
-            else {
-                running.add(job.getFullJobId());
+            else if (slots[s].getFullJobId().equals(job.getFullJobId())) {
+                log.warn("Node "+shortName+" is already running "+job.getFullJobId()+" on slot "+s);
+                slotsLeft--;
+                job.setNode(this);
             }
-        }
+            else {
+                running.add(slots[s].getFullJobId());
+            }
+        }   
         if (slotsLeft>0) {
             log.debug("Node state: {}",this);
-            log.error("Node "+shortName+" cannot allocate "+slotsLeft+" slots for "+job.getFullJobId()+" because other jobs are running: ["+running+"]");
+            log.error("Node "+shortName+" cannot allocate "+slotsLeft+" slots for "+job.getFullJobId()+" because other jobs are running: "+running);
         }
         return indexes;
     }

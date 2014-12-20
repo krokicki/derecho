@@ -158,7 +158,7 @@ public class GridState {
             try {
                 SnapshotJob ssJob = event.getSnapshotJob();
                 GridJob gridJob = new GridJob(ssJob);
-                log.debug(name+" - adding queued job {}",gridJob);
+                log.debug(name+" - {} - queued job {}",event.getOffset(),gridJob);
                 addQueuedJob(gridJob);
             }
             catch (Exception e) {
@@ -192,12 +192,12 @@ public class GridState {
                         stateJob.update(snapshotJob);
                         List<Integer> slots = stateNode.assignJobToSlots(stateJob);
                         incrementSlots(stateJob.getOwner(), stateJob.getSlots());
-                        log.debug(name+" - assigned job {} to slots {}",stateJob,slots);
+                        log.debug(name+" - {} - started job {}",event.getOffset(),stateJob);
                     }
                 }
             }
             catch (Exception e) {
-                log.error(name+" - could not assign job {}",fullJobId,e);
+                log.error(name+" - could not start job {}",fullJobId,e);
                 return false;
             }
             break;
@@ -206,12 +206,12 @@ public class GridState {
                 if (stateJob==null) {
                     throw new IllegalStateException("Cannot end job which doesn't exist: "+fullJobId);
                 }
-                log.debug(name+" - finishing job {}",stateJob);
+                log.debug(name+" - {} - ended job {}",event.getOffset(),stateJob);
                 incrementSlots(stateJob.getOwner(), -1*stateJob.getSlots());
                 removeJob(stateJob);
             }
             catch (Exception e) {
-                log.error(name+" - could not finish job {}",fullJobId,e);
+                log.error(name+" - could not end job {}",fullJobId,e);
                 return false;
             }
             break;

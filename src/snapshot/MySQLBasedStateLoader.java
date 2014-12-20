@@ -60,7 +60,6 @@ public class MySQLBasedStateLoader extends StateLoader {
     public boolean loadInitial(String sql) throws Exception {
 
         log.debug("Loading initial");
-        int numLoaded = 0;
         
         Connection conn = null;
         PreparedStatement stmt = null;
@@ -80,7 +79,6 @@ public class MySQLBasedStateLoader extends StateLoader {
                 log.debug("Loading snapshot: {}",snapshotDate);
                 try {
                     loadSnapshot(snapshotDate);
-                    numLoaded++;
                 }
                 catch (Exception e) {
                     log.error("Error adding snapshot: {}",snapshotDate,e);
@@ -95,7 +93,7 @@ public class MySQLBasedStateLoader extends StateLoader {
             if (conn!=null) conn.close();   
         }
         
-        return numLoaded>0;
+        return !timeline.getSnapshots().isEmpty();
     }
 
     public boolean loadNextSnapshot() throws Exception {

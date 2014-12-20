@@ -152,7 +152,7 @@ public class GridJob {
     @Override
     public String toString() {
         String nodeName = node==null?"":node.getShortName();
-        return "GridJob [jobId=" + getFullJobId() + ", node=" + nodeName + ", owner="
-                + owner + ", slots=" + slots + "]";
+        return "GridJob[" + getFullJobId() + ", " + nodeName + ", "
+                + owner + ", slots=" + slots + ", state=" + state + "]";
     }
 }

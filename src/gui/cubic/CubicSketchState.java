@@ -470,7 +470,7 @@ public class CubicSketchState implements Runnable {
             return slice;
         }
         
-        SortedMap<Long,List<Event>> eventSlice = timeline.getEvents().subMap(prevElapsed, totalElapsed);
+        SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(prevElapsed, totalElapsed);
         
         log.trace("getNextSlice, eventSlice.size={}",eventSlice.size());
         

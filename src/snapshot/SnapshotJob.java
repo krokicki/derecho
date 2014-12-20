@@ -110,7 +110,7 @@ public class SnapshotJob {
     @Override
     public String toString() {
         String nodeName = node==null?"":node.getShortName();
-        return "SnapshotJob [jobId=" + getFullJobId() + ", node=" + nodeName + ", owner="
-                + owner + ", slots=" + slots + ", state=" + state + ", subTime="+subTime+", startTime="+startTime+"]";
+        return "SnapshotJob[" + getFullJobId() + ", " + nodeName + ", "
+                + owner + ", slots=" + slots + ", state=" + state + "]";
     }
 }

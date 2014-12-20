@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.LinkedBlockingDeque;
 
@@ -36,7 +37,7 @@ public class Timeline {
     
     public static final int MAX_NUM_SNAPSHOTS = 100;
     public static final int MIN_SNAPSHOT_RESOLUTION_SECS = 300; // 5 mins
-    public static final long LIVE_LAG_MS = 5000; // 5 seconds       
+    public static final long LIVE_LAG_MS = 30000; // 30 seconds
     
     // Loaded timeline 
     private Snapshot penultimateSnapshot;
@@ -98,6 +99,7 @@ public class Timeline {
         
         log.debug("---------------------------------------------------------------------");
         log.info("Adding snapshot with offset={}",snapshotOffset);
+        addEvent(new SnapshotEvent(snapshotOffset));
 
         Map<Integer,Date> parallelJobStarts = snapshot.getParallelJobStarts();
 
@@ -114,11 +116,11 @@ public class Timeline {
         
         // Check all known jobs, and generate delete events for the ones that are no longer relevant. 
         for(GridJob stateJob : loadState.getJobMap().values()) {
-            String fullJobId = stateJob.getFullJobId();
             if (!ssJobIds.contains(stateJob.getFullJobId())) { 
                 // Assume the job ended right after the last snapshot
                 long endOffset = prevSnapshotOffset+1;
-                // Parallel queued jobs end when the parallel jobs start
+                // Parallel queued jobs end when the parallel jobs start. Note the intentional use of jobId instead of 
+                // fullJobId since this is a parallel job. 
                 if (parallelJobStarts.containsKey(stateJob.getJobId())) {
                     endOffset = getOffset(parallelJobStarts.get(stateJob.getJobId()));
                 }
@@ -199,8 +201,6 @@ public class Timeline {
                 }
             }
         }
-        
-        addEvent(new SnapshotEvent(snapshotOffset));
 
         log.trace("Will apply events to state..");
         
@@ -257,6 +257,7 @@ public class Timeline {
         if (event instanceof GridEvent) {
             GridEvent gridEvent = (GridEvent)event;
             if (eventCache.containsKey(gridEvent.getCacheKey())) {
+                log.warn("Event was already cached: {}",gridEvent.getCacheKey());
                 return false;
             }
             eventCache.put(gridEvent.getCacheKey(), event.getOffset());
@@ -264,18 +265,32 @@ public class Timeline {
         
         List<Event> events = eventMap.get(event.getOffset());
         if (events==null) {
-            events = new ArrayList<Event>();
+            events = Collections.synchronizedList(new ArrayList<Event>());
             eventMap.put(event.getOffset(), events);
+            log.info("Adding offset bucket {}",event.getOffset());
         }
-        events.add(event);
+        synchronized (events) {
+            events.add(event);
+        }
         
         List<Event> snapshotEvents = snapshotEventMap.get(event.getOffset());
         if (snapshotEvents==null) {
             snapshotEvents = Collections.synchronizedList(new ArrayList<Event>());
             snapshotEventMap.put(event.getOffset(), snapshotEvents);
         }
-        snapshotEvents.add(event);
+        synchronized (snapshotEvents) {
+            snapshotEvents.add(event);
+        }
+        
         return true;
+    }
+    
+    public synchronized int getNumOffsets() {
+        return eventMap.size();
+    }
+
+    public synchronized SortedSet<Long> getOffsets() {
+        return eventMap.keySet();
     }
     
     private void setNumRunningJobs(long offset, int numRunningJobs) {
@@ -333,6 +348,12 @@ public class Timeline {
         if (ultimateSnapshot==null) return 0;
         long lastOffset = getOffset(penultimateSnapshot.getSamplingTime());
         long snapshotInterval = getOffset(ultimateSnapshot.getSamplingTime()) - lastOffset;
+        if (lastOffset==0) {
+            // Only loaded 2 snapshots, probably because they're very far apart, so we can force the "live" offset here.    
+            long liveOffset = snapshotInterval - MIN_SNAPSHOT_RESOLUTION_SECS*1000;
+            if (liveOffset<0) return 0;
+            return liveOffset;
+        }
         return lastOffset - snapshotInterval - LIVE_LAG_MS;
     }
     
@@ -340,8 +361,8 @@ public class Timeline {
         return getFirstOffset()+getLength();
     }
     
-    public synchronized SortedMap<Long,List<Event>> getEvents() {
-        return ImmutableSortedMap.copyOf(eventMap);
+    public synchronized SortedMap<Long,List<Event>> getEvents(Long startOffset, Long endOffset) {
+        return ImmutableSortedMap.copyOf(eventMap.subMap(startOffset, endOffset));
     }
     
     public synchronized List<Snapshot> getSnapshots() {
@@ -360,7 +381,7 @@ public class Timeline {
         }
     }
     
-    public void printEventMap() {
+    private void printEventMap() {
         log.trace("Current Timeline:");
         for(Long offset : eventMap.keySet()) {
             List<Event> events = eventMap.get(offset);

@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,10 +48,8 @@ public class Snapshot {
         // jobs when they start. We need to detect that case and add 'tasks' indexes to the running jobs so that they 
         // are treated as separate jobs.
         Map<String,AtomicInteger> ssJobCount = new HashMap<String,AtomicInteger>();
-        Map<String,SnapshotJob> ssJobMap = new HashMap<String,SnapshotJob>();
         for(SnapshotNode node : getNodes()) {          
             for(SnapshotJob ssJob : node.getJobs()) {
-                ssJobMap.put(ssJob.getFullJobId(), ssJob);
                 // Only worry about jobs without task numbers
                 if (ssJob.getTasks()!=null && !"".equals(ssJob.getTasks())) continue;
                 AtomicInteger count = ssJobCount.get(ssJob.getFullJobId());
@@ -68,7 +65,7 @@ public class Snapshot {
         for(String fullJobId : ssJobCount.keySet()) {
             AtomicInteger count = ssJobCount.get(fullJobId);
             if (count.get()>1) {
-                log.trace("Parallel job "+fullJobId+" detected. Adding task numbers.");
+                log.debug("Parallel job "+fullJobId+" detected. Adding task numbers.");
                 // More than one instance of this job, give it task numbers
                 int index = 1;
                 for(SnapshotNode node : getOrderedNodes()) {          
@@ -107,42 +104,6 @@ public class Snapshot {
 
     public List<SnapshotJob> getQueuedJobs() {
         return queuedJobs;
-    }
-
-    public void eraseJob(String fullJobId) {
-        log.debug("Erasing job {} from snapshot {}",fullJobId,samplingTime);
-        for(SnapshotNode node : nodes) {
-            for(Iterator<SnapshotJob> iterator = node.getJobs().iterator(); iterator.hasNext(); ) { 
-                SnapshotJob job = iterator.next();
-                if (job.getFullJobId().equals(fullJobId)) {
-                    iterator.remove();
-                }
-            }
-        }
-        for(Iterator<SnapshotJob> iterator = queuedJobs.iterator(); iterator.hasNext(); ) {
-            SnapshotJob job = iterator.next();
-            if (job.getFullJobId().equals(fullJobId)) {
-                iterator.remove();
-            }
-        }
-    }   
-
-    public SnapshotJob getJob(String fullJobId) {
-        for(SnapshotNode node : nodes) {
-            for(Iterator<SnapshotJob> iterator = node.getJobs().iterator(); iterator.hasNext(); ) { 
-                SnapshotJob job = iterator.next();
-                if (job.getFullJobId().equals(fullJobId)) {
-                    return job;
-                }
-            }
-        }
-        for(Iterator<SnapshotJob> iterator = queuedJobs.iterator(); iterator.hasNext(); ) {
-            SnapshotJob job = iterator.next();
-            if (job.getFullJobId().equals(fullJobId)) {
-                return job;
-            }
-        }
-        return null;
     }
 
     public Map<Integer, Date> getParallelJobStarts() {
