@@ -20,6 +20,7 @@ import snapshot.Snapshot;
 import snapshot.SnapshotJob;
 import snapshot.SnapshotNode;
 import timeline.GridEvent.EventType;
+import util.ConfigProperties;
 import util.LRUCache;
 
 import com.google.common.collect.ImmutableList;
@@ -35,9 +36,9 @@ public class Timeline {
     
     private static final Logger log = LoggerFactory.getLogger(Timeline.class);
     
-    public static final int MAX_NUM_SNAPSHOTS = 100;
+    public static final int MAX_NUM_SNAPSHOTS = ConfigProperties.getInteger("derecho.data.max.snapshots",100);
     public static final int MIN_SNAPSHOT_RESOLUTION_SECS = 300; // 5 mins
-    public static final long LIVE_LAG_MS = 30000; // 30 seconds
+    public static final long LIVE_LAG_MS = ConfigProperties.getInteger("derecho.data.live.delay.secs",30)*1000;
     
     // Loaded timeline 
     private Snapshot penultimateSnapshot;
