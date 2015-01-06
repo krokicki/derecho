@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project name="Derecho" default="dist">
-        
+ 
+    <!-- These 2 lines are required for AppBundler -->
+    <taskdef name="bundleapp" classname="com.oracle.appbundler.AppBundlerTask"/>
+    <property environment="env" />
+
     <property name="src.dir" value="${basedir}/src" />
     <property name="data.dir" value="${basedir}/src/data" />
     <property name="lib.dir" value="${basedir}/lib" />
@@ -91,5 +95,48 @@
         <chmod file="${final.script}" perm="ugo+x"/>
         
     </target>
-    
+ 
+    <target name="dist-mac" depends="dist">
+
+        <!-- Unfortunately, AppBundler does not support arbitrary files on the classpath, 
+             so we need to group the config files into a jar and include that -->
+
+        <mkdir dir="${final.dir}/config" />
+
+        <copy todir="${final.dir}/config" flatten="true">
+            <fileset dir="${basedir}">
+                <include name="*.properties" />
+            </fileset>
+            <fileset dir="${conf.dir}">
+                <include name="*.xml" />
+            </fileset>
+        </copy>
+
+        <jar destfile="${final.dir}/config.jar">
+            <fileset dir="${final.dir}/config" />
+        </jar>
+
+        <bundleapp outputdirectory="${build.dir}"
+                name="Derecho"
+                displayname="Derecho"
+                identifier="org.janelia.derecho"
+                shortversion="2.0"
+                icon="images/3x3_grid.icns"
+                applicationCategory="public.app-category.developer-tools"
+                mainclassname="gui.GridSketch">
+            <!-- Uncomment to include the JRE (bundle size goes from 12 MB to 150 MB) -->
+            <!--<runtime dir="${env.JAVA_HOME}"/>-->
+            <classpath dir="${final.dir}">
+                <include name="**/*.jar"/>
+                <include name="config.jar"/>
+            </classpath>
+            <option value="-Xms512M"/>
+            <option value="-Xmx4096M"/>
+            <option value="-DAPP_CONFIG=app.properties"/>
+            <option value="-DGRID_CONFIG=grid_config.xml"/>
+        </bundleapp>
+
+     </target>
+
+
 </project>
