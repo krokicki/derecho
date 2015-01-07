@@ -2,7 +2,7 @@
 <project name="Derecho" default="dist">
  
     <!-- These 2 lines are required for AppBundler -->
-    <taskdef name="bundleapp" classname="com.oracle.appbundler.AppBundlerTask"/>
+    <taskdef name="bundleapp" classname="com.oracle.appbundler.AppBundlerTask" />
     <property environment="env" />
 
     <property name="src.dir" value="${basedir}/src" />
@@ -130,6 +130,7 @@
                 <include name="**/*.jar"/>
                 <include name="config.jar"/>
             </classpath>
+            <option value="-da"/>
             <option value="-Xms512M"/>
             <option value="-Xmx4096M"/>
             <option value="-DAPP_CONFIG=app.properties"/>

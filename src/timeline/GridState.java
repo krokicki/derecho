@@ -173,7 +173,7 @@ public class GridState {
                 }
                 SnapshotJob snapshotJob = event.getSnapshotJob();
                 if (snapshotJob==null) {
-                    log.error(name+" - cannot start a null job, event={}",event.getCacheKey());
+                    log.error(name+" - cannot start a null job for {}",event);
                 }
                 else {
                     SnapshotNode snapshotNode = snapshotJob.getNode();

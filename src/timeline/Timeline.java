@@ -255,10 +255,15 @@ public class Timeline {
     }
     
     private synchronized boolean addEvent(Event event) {
+        
+        // Sanity check
+        assert event.getOffset()>getOffset(penultimateSnapshot.getSamplingTime()) : "Event occurs before the previous snapshot: "+event;
+        assert event.getOffset()<=getOffset(ultimateSnapshot.getSamplingTime()) : "Event occurs after the current snapshot: "+event;
+        
         if (event instanceof GridEvent) {
             GridEvent gridEvent = (GridEvent)event;
             if (eventCache.containsKey(gridEvent.getCacheKey())) {
-                log.warn("Event was already cached: {}",gridEvent.getCacheKey());
+                log.warn("Event was already cached: {}",gridEvent);
                 return false;
             }
             eventCache.put(gridEvent.getCacheKey(), event.getOffset());
@@ -389,7 +394,7 @@ public class Timeline {
             for(Event event : events) {
                 if (event instanceof GridEvent) {
                     GridEvent gridEvent = (GridEvent)event;
-                    log.trace(padRight(""+event.getOffset(), 10)+" "+gridEvent.getCacheKey());
+                    log.trace(padRight(""+event.getOffset(), 10)+" "+gridEvent);
                 }
                 else if (event instanceof SnapshotEvent) {
                     log.trace(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---"); 

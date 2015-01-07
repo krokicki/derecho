@@ -65,9 +65,6 @@ public class GridEvent extends Event {
 
     @Override
     public String toString() {
-        return "GridEvent [fullJobId=" + fullJobId + ", offset=" + getOffset()
-                + ", ssJob=" + ssJob + ", type=" + type + "]";
+        return "GridEvent[" + getCacheKey() + ", offset=" + getOffset() + "]";
     }
-    
-    
 }
