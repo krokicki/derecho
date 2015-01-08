@@ -194,6 +194,7 @@ public class SketchState implements Runnable {
     private String currSubsetName;
     
     private double playSpeed = 1.0f;
+    private long prevElapsed;
     private long totalElapsed = 0;
     private Date lastSliceRequestDate;
     private long nextStartingPosition = 0;
@@ -310,7 +311,6 @@ public class SketchState implements Runnable {
                             removeJobSprite(jobSprite);
                         }
                         else {
-                            // Parse a jobId like this: 1275988.2828-4000:1
                             int slots = 1;
                             if (jobSprite.queued) {
                                 // If a job is queued then it is represented by a single sprite, so we need the
@@ -320,8 +320,9 @@ public class SketchState implements Runnable {
                                     slots = job.getSlots();
                                 }
                             }
-                            
+
                             if (jobSprite.getName().contains(":")) {
+                                // Parse a jobId like this: 1275988.2828-4000:1
                                 try {
                                     Pattern p = Pattern.compile("(\\d+)\\.(\\d+)-(\\d+):(\\d+)");
                                     Matcher m = p.matcher(jobSprite.getName());
@@ -330,6 +331,22 @@ public class SketchState implements Runnable {
                                         int end = Integer.parseInt(m.group(3));
                                         int interval = Integer.parseInt(m.group(4));
                                         slots = (end-start)/interval;
+                                    }
+                                } 
+                                catch (Exception e) {
+                                    log.error("Error parsing jobId: "+jobSprite.getName(),e);
+                                }
+                            }
+                            else if (jobSprite.getName().contains(",")) {
+                                // Parse a jobId like this: 2968157.205,211
+                                try {
+                                    Pattern p = Pattern.compile("(\\d+)\\.(\\d+),(\\d+)");
+                                    Matcher m = p.matcher(jobSprite.getName());
+                                    if (m.matches()) {
+                                        int first = Integer.parseInt(m.group(2));
+                                        int second = Integer.parseInt(m.group(3));
+                                        //  There are two jobs listed here, so we require twice the number of slots
+                                        slots *= 2;
                                     }
                                 } 
                                 catch (Exception e) {
@@ -432,6 +449,8 @@ public class SketchState implements Runnable {
         
         // Apply all events between the closet snapshot and the desired starting position
         this.totalElapsed = timeline.getOffset((reqSnapshot.getSamplingTime()))+1;
+        // This must be set before calling updateState for the first time after changing the position (i.e. totalElapsed)
+        this.prevElapsed = totalElapsed;
         long elapsed = nextStartingPosition - totalElapsed;
         if (elapsed<0) {
             log.warn("Negative time elapsed. Normalizing to nextStartingPosition={}",nextStartingPosition);
@@ -847,15 +866,12 @@ public class SketchState implements Runnable {
         }
     }
     
-    private long prevElapsed;
-    
     private List<GridEvent> getNextSlice(long elapsed) {
         
         List<GridEvent> slice = new ArrayList<GridEvent>();
         if (elapsed<=0) return slice;
-        
-        prevElapsed = totalElapsed;
-        totalElapsed += elapsed;
+
+        this.totalElapsed += elapsed;
         
         if (prevElapsed>=totalElapsed) {
             log.warn("No slice possible with (prevElapsed={}, totalElapsed={})",prevElapsed,totalElapsed);
@@ -868,6 +884,11 @@ public class SketchState implements Runnable {
         SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(start, end);
 
         if (!eventSlice.isEmpty()) {
+            // We only move the start of the window up when we find an event. This done because the database might
+            // have gaps if the incoming events cannot be processed in real-time. In that case, we don't want to 
+            // miss any events if they come late. 
+            this.prevElapsed = totalElapsed;
+            
             log.trace("Timeline has {} offset buckets",timeline.getNumOffsets());
             log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
         }
@@ -887,12 +908,12 @@ public class SketchState implements Runnable {
                     for(Event event : events) {
                     	if (event instanceof GridEvent) {
                     		GridEvent gridEvent = (GridEvent)event;
-                            log.trace("Got grid event {}",gridEvent.getCacheKey());
+                            log.trace("Got grid event {}",gridEvent);
         	                slice.add(gridEvent);
                     	}
                     	else if (event instanceof SnapshotEvent) {
                     	    SnapshotEvent gridEvent = (SnapshotEvent)event;
-                            log.trace("Got snapshot event {}",gridEvent.getOffset());
+                            log.trace("Got snapshot event {}",gridEvent);
                     	}
                     	else {
                             log.trace("Got unrecognized event {}",event);
@@ -1506,7 +1527,7 @@ public class SketchState implements Runnable {
                 
                 Long startOffset = slotStartOffsets.get(name);
                 if (startOffset!=null) {
-                    usage += totalElapsed-startOffset;
+                    usage += totalElapsed - startOffset;
                 }
                 
                 long total = totalElapsed - nextStartingPosition;
