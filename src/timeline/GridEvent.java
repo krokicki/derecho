@@ -60,11 +60,11 @@ public class GridEvent extends Event {
     
     public String getCacheKey() {
         if (fullJobId==null) return type.toString();
-        return type.toString()+"_"+fullJobId;
+        return type.toString()+"_"+fullJobId+"@"+getOffset();
     }
 
     @Override
     public String toString() {
-        return "GridEvent[" + getCacheKey() + ", offset=" + getOffset() + "]";
+        return "GridEvent[" + getCacheKey() + "]";
     }
 }
