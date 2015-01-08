@@ -54,7 +54,7 @@ public class GridState {
         
         for(SnapshotJob ssJob : snapshot.getQueuedJobs()) {
             GridJob job = new GridJob(ssJob);
-            log.debug(name+" init - Adding queued job {}",job);
+            log.trace(name+" init - Adding queued job {}",job);
             addQueuedJob(job);
         }
             
@@ -158,7 +158,7 @@ public class GridState {
             try {
                 SnapshotJob ssJob = event.getSnapshotJob();
                 GridJob gridJob = new GridJob(ssJob);
-                log.debug(name+" - {} - queued job {}",event.getOffset(),gridJob);
+                log.trace(name+" - {} - queued job {}",event.getOffset(),gridJob);
                 addQueuedJob(gridJob);
             }
             catch (Exception e) {
