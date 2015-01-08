@@ -69,7 +69,9 @@ public class CubicSketchState implements Runnable {
     // State for playing
     private PlayState playState = PlayState.PAUSED;
     private GridState state;
+    
     private double playSpeed = 10.0f;
+    private long prevElapsed;
     private long totalElapsed = 0;
     private Date lastSliceRequestDate;
     private long nextStartingPosition = 0;
@@ -103,7 +105,7 @@ public class CubicSketchState implements Runnable {
                 
                 // Check if we've been truncated, and move forward if necessary
                 if (totalElapsed < timeline.getFirstOffset()) {
-                    log.info("Elapsed time ({}) occurs before the current timeline ({})",elapsed,timeline.getFirstOffset());
+                    log.info("Elapsed time ({}) occurs before the current timeline ({})",totalElapsed,timeline.getFirstOffset());
                     
                     long position = elapsed;
                     boolean noMatch = true;
@@ -137,7 +139,6 @@ public class CubicSketchState implements Runnable {
                             removeJobActor(jobActor.name, jobActor);
                         }
                         else {
-                            // Parse a jobId like this: 1275988.2828-4000:1
                             int slots = 1;
                             if (jobActor.queued) {
                                 // If a job is queued then it is represented by a single sprite, so we need the
@@ -149,6 +150,7 @@ public class CubicSketchState implements Runnable {
                             }
                             
                             if (jobActor.getName().contains(":")) {
+                                // Parse a jobId like this: 1275988.2828-4000:1
                                 try {
                                     Pattern p = Pattern.compile("(\\d+)\\.(\\d+)-(\\d+):(\\d+)");
                                     Matcher m = p.matcher(jobActor.getName());
@@ -163,7 +165,23 @@ public class CubicSketchState implements Runnable {
                                     log.error("Error parsing jobId: "+jobActor.getName(),e);
                                 }
                             }
-
+                            else if (jobActor.getName().contains(",")) {
+                                // Parse a jobId like this: 2968157.205,211
+                                try {
+                                    Pattern p = Pattern.compile("(\\d+)\\.(\\d+),(\\d+)");
+                                    Matcher m = p.matcher(jobActor.getName());
+                                    if (m.matches()) {
+                                        int first = Integer.parseInt(m.group(2));
+                                        int second = Integer.parseInt(m.group(3));
+                                        //  There are two jobs listed here, so we require twice the number of slots
+                                        slots *= 2;
+                                    }
+                                } 
+                                catch (Exception e) {
+                                    log.error("Error parsing jobId: "+jobActor.getName(),e);
+                                }
+                            }
+                            
                             String user = jobActor.getUsername();
                             if (!slotsUsedByUser.containsKey(user)) {
                                 slotsUsedByUser.put(user, 0);
@@ -215,7 +233,7 @@ public class CubicSketchState implements Runnable {
         for(Snapshot snapshot : timeline.getSnapshots()) {
             long offset = timeline.getOffset(snapshot.getSamplingTime());
             
-            log.info("Snapshot {} has offset {}",i,offset);
+            log.debug("Snapshot {} has offset {}",i,offset);
             
             if (offset>=nextStartingPosition) {
                 if (prevSnapshot==null) {
@@ -247,8 +265,15 @@ public class CubicSketchState implements Runnable {
         
         // Apply all events between the closet snapshot and the desired starting position
         this.totalElapsed = timeline.getOffset((reqSnapshot.getSamplingTime()))+1;
+        // This must be set before calling updateState for the first time after changing the position (i.e. totalElapsed)
+        this.prevElapsed = totalElapsed;
         long elapsed = nextStartingPosition - totalElapsed;
-
+        if (elapsed<0) {
+            log.warn("Negative time elapsed. Normalizing to nextStartingPosition={}",nextStartingPosition);
+            totalElapsed = nextStartingPosition;
+            elapsed = nextStartingPosition;
+        }
+        
         log.info("Buffering elapsed: {}",elapsed);
         this.tweenChanges = false;
         updateState(elapsed);
@@ -450,8 +475,11 @@ public class CubicSketchState implements Runnable {
     private void updateState(long elapsed) {
         // Update the job actors
         List<GridEvent> events = getNextSlice(elapsed);
-        for(GridEvent event : events) {
-            applyEvent(event);
+        if (!events.isEmpty()) {
+            log.debug("Applying {} events",events.size());
+            for(GridEvent event : events) {
+                applyEvent(event);
+            }
         }
     }
     
@@ -459,9 +487,8 @@ public class CubicSketchState implements Runnable {
         
         List<GridEvent> slice = new ArrayList<GridEvent>();
         if (elapsed<=0) return slice;
-        
-        long prevElapsed = totalElapsed;
-        totalElapsed += elapsed;
+
+        this.totalElapsed += elapsed;
         
         log.trace("getNextSlice, prevElapsed={}, totalElapsed={}",prevElapsed,totalElapsed);
         
@@ -469,23 +496,51 @@ public class CubicSketchState implements Runnable {
             log.warn("No slice possible with (prevElapsed={}, totalElapsed={})",prevElapsed,totalElapsed);
             return slice;
         }
+
+        long start = prevElapsed;
+        long end = totalElapsed;
         
-        SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(prevElapsed, totalElapsed);
+        SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(start, end);
+
+        if (!eventSlice.isEmpty()) {
+            // We only move the start of the window up when we find an event. This done because the database might
+            // have gaps if the incoming events cannot be processed in real-time. In that case, we don't want to 
+            // miss any events if they come late. 
+            this.prevElapsed = totalElapsed;
+            
+            log.trace("Timeline has {} offset buckets",timeline.getNumOffsets());
+            log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
+        }
         
-        log.trace("getNextSlice, eventSlice.size={}",eventSlice.size());
-        
-        for(Long offset : eventSlice.keySet()) {
-            List<Event> events = eventSlice.get(offset);
-            for(Event event : events) {
-            	if (event instanceof GridEvent) {
-            		GridEvent gridEvent = (GridEvent)event;
-	                if (gridEvent.getOffset()>=totalElapsed) {
-	                    break;
-	                }
-	                log.trace("getNextSlice\t{}\t{}",gridEvent.getOffset(),gridEvent.getCacheKey());
-	                slice.add(gridEvent);
-            	}
+        if (!eventSlice.isEmpty()) {
+            for(Long offset : eventSlice.keySet()) {
+                log.trace("Got offset bucket {}",offset);
+                if (offset>=totalElapsed) {
+                    log.warn("Timeline returned grid events outside the requested frame: {}>{}",offset,totalElapsed);
+                    break;
+                }
+                List<Event> events = eventSlice.get(offset);
+                synchronized (events) {
+                    if (events.isEmpty()) {
+                        log.trace("Got empty offset bucket for offset {}",offset);
+                    }
+                    for(Event event : events) {
+                        if (event instanceof GridEvent) {
+                            GridEvent gridEvent = (GridEvent)event;
+                            log.trace("Got grid event {}",gridEvent);
+                            slice.add(gridEvent);
+                        }
+                        else if (event instanceof SnapshotEvent) {
+                            SnapshotEvent gridEvent = (SnapshotEvent)event;
+                            log.trace("Got snapshot event {}",gridEvent);
+                        }
+                        else {
+                            log.trace("Got unrecognized event {}",event);
+                        }
+                    }
+                }
             }
+
         }
         
         return slice;
