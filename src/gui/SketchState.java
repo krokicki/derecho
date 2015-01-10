@@ -884,16 +884,7 @@ public class SketchState implements Runnable {
         SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(start, end);
 
         if (!eventSlice.isEmpty()) {
-            // We only move the start of the window up when we find an event. This done because the database might
-            // have gaps if the incoming events cannot be processed in real-time. In that case, we don't want to 
-            // miss any events if they come late. 
-            this.prevElapsed = totalElapsed;
             
-            log.trace("Timeline has {} offset buckets",timeline.getNumOffsets());
-            log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
-        }
-        
-        if (!eventSlice.isEmpty()) {
             for(Long offset : eventSlice.keySet()) {
                 log.trace("Got offset bucket {}",offset);
                 if (offset>=totalElapsed) {
@@ -921,7 +912,17 @@ public class SketchState implements Runnable {
                     }
                 }
             }
+        }
 
+        if (!slice.isEmpty()) {
+            // We only move the start of the window up when we find an event. This done because the database might
+            // have gaps if the incoming events cannot be processed in real-time. In that case, we don't want to 
+            // miss any events if they come late. 
+            this.prevElapsed = totalElapsed;
+            log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets with "+slice.size()+" grid events",start,end);
+        }
+        else if (!eventSlice.isEmpty()) {
+            log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
         }
         
         return slice;
