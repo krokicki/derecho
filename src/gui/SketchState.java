@@ -919,10 +919,10 @@ public class SketchState implements Runnable {
             // have gaps if the incoming events cannot be processed in real-time. In that case, we don't want to 
             // miss any events if they come late. 
             this.prevElapsed = totalElapsed;
-            log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets with "+slice.size()+" grid events",start,end);
+            log.debug("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets with "+slice.size()+" grid events",start,end);
         }
         else if (!eventSlice.isEmpty()) {
-            log.trace("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
+            log.debug("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
         }
         
         return slice;
