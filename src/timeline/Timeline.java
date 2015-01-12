@@ -43,10 +43,11 @@ public class Timeline {
     // Loaded timeline 
     private Snapshot penultimateSnapshot;
     private Snapshot ultimateSnapshot;
+    private long penultimateOffset;
+    private long ultimateOffset;
     private LinkedBlockingDeque<Snapshot> snapshots = new LinkedBlockingDeque<Snapshot>();
     private ConcurrentSkipListMap<Long,List<Event>> eventMap = new ConcurrentSkipListMap<Long,List<Event>>();
     private Date firstSnapshotDate;
-    private Date lastSnapshotDate;
     
     // Offsets mapped to various time series
     private Map<Long,Integer> numRunningJobsMap = new ConcurrentSkipListMap<Long,Integer>();
@@ -58,7 +59,6 @@ public class Timeline {
     private LRUCache<String,Long> eventCache = new LRUCache<String,Long>(100000);
     private Integer numRunningJobs = null;
     private Integer numQueuedJobs = null;
-    private long prevSnapshotOffset = 0;
             
     public synchronized void addSnapshot(Snapshot snapshot) {
         
@@ -88,19 +88,19 @@ public class Timeline {
             }
             return;
         }
-        
-        this.lastSnapshotDate = snapshot.getSamplingTime();
-        
-        long snapshotOffset = getOffset(snapshot.getSamplingTime());
+
+        // These offsets cannot be calculated until the firstSnapshotDate is known.
+        this.penultimateOffset = penultimateSnapshot==null?0:getOffset(penultimateSnapshot.getSamplingTime());
+        this.ultimateOffset = getOffset(ultimateSnapshot.getSamplingTime());
         
         long prevKeptSnapshotOffset = getOffset(snapshots.peekLast().getSamplingTime());
-        if (snapshotOffset-prevKeptSnapshotOffset > MIN_SNAPSHOT_RESOLUTION_SECS*1000) {
+        if (ultimateOffset-prevKeptSnapshotOffset > MIN_SNAPSHOT_RESOLUTION_SECS*1000) {
             snapshots.add(snapshot);
         }
         
         log.debug("---------------------------------------------------------------------");
-        log.info("Adding snapshot with offset={}",snapshotOffset);
-        addEvent(new SnapshotEvent(snapshotOffset));
+        log.info("Adding snapshot with offset={}",ultimateOffset);
+        addEvent(new SnapshotEvent(ultimateOffset));
 
         Map<Integer,Date> parallelJobStarts = snapshot.getParallelJobStarts();
 
@@ -119,11 +119,18 @@ public class Timeline {
         for(GridJob stateJob : loadState.getJobMap().values()) {
             if (!ssJobIds.contains(stateJob.getFullJobId())) { 
                 // Assume the job ended right after the last snapshot
-                long endOffset = prevSnapshotOffset+1;
+                long endOffset = penultimateOffset+1;
                 // Parallel queued jobs end when the parallel jobs start. Note the intentional use of jobId instead of 
                 // fullJobId since this is a parallel job. 
                 if (parallelJobStarts.containsKey(stateJob.getJobId())) {
-                    endOffset = getOffset(parallelJobStarts.get(stateJob.getJobId()));
+                    long startOffset = getOffset(parallelJobStarts.get(stateJob.getJobId()));
+                    if (startOffset>endOffset) {
+                        // Don't move end events into the past, because they won't be processed 
+                        endOffset = startOffset;
+                    }
+                    else {
+                        log.warn("MPI queued job started in the past and we missed it: {}",stateJob);
+                    }
                 }
                 boolean e1 = addEvent(new GridEvent(EventType.END, endOffset, stateJob.getFullJobId()));
                 if (e1) {
@@ -144,10 +151,10 @@ public class Timeline {
                         long startOffset = getOffset(ssJob.getStartTime());
                         // It's already been started, so that means we missed the queuing
                         long queueOffset = startOffset;
-                        if (startOffset<prevSnapshotOffset+1) startOffset=prevSnapshotOffset+1;
-                        if (queueOffset<prevSnapshotOffset+1) queueOffset=prevSnapshotOffset+1;
-                        if (startOffset>snapshotOffset) startOffset=snapshotOffset;
-                        if (queueOffset>snapshotOffset) queueOffset=snapshotOffset;
+                        if (startOffset<penultimateOffset+1) startOffset=penultimateOffset+1;
+                        if (queueOffset<penultimateOffset+1) queueOffset=penultimateOffset+1;
+                        if (startOffset>ultimateOffset) startOffset=ultimateOffset;
+                        if (queueOffset>ultimateOffset) queueOffset=ultimateOffset;
                         
                         boolean e1 = addEvent(new GridEvent(EventType.SUB, queueOffset, ssJob));
                         boolean e2 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));  
@@ -167,8 +174,8 @@ public class Timeline {
                     if (stateJob.getStartTime()==null && ssJob.getStartTime()!=null) {
                         // Job just started
                         long startOffset = getOffset(ssJob.getStartTime());
-                        if (startOffset<prevSnapshotOffset+1) startOffset=prevSnapshotOffset+1;
-                        if (startOffset>snapshotOffset) startOffset=snapshotOffset;
+                        if (startOffset<penultimateOffset+1) startOffset=penultimateOffset+1;
+                        if (startOffset>ultimateOffset) startOffset=ultimateOffset;
                         boolean e1 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));
                         if (e1) {
                             log.debug("    "+ssJob+" (known) started at "+startOffset); 
@@ -194,8 +201,8 @@ public class Timeline {
                 stateJob = new GridJob(ssJob);
                 long subOffset = getOffset(stateJob.getSubTime()==null?stateJob.getStartTime():stateJob.getSubTime());
                 // Submission was before this snapshot's range, so move it into range.
-                if (subOffset<prevSnapshotOffset+1) subOffset=prevSnapshotOffset+1;
-                if (subOffset>snapshotOffset) subOffset=snapshotOffset;
+                if (subOffset<penultimateOffset+1) subOffset=penultimateOffset+1;
+                if (subOffset>ultimateOffset) subOffset=ultimateOffset;
                 boolean e1 = addEvent(new GridEvent(EventType.SUB, subOffset, ssJob));
                 if (e1) {
                     log.debug("    "+ssJob+" (new) subbed at "+subOffset);  
@@ -221,7 +228,6 @@ public class Timeline {
                         }
                         setNumRunningJobs(event.getOffset(),loadState.getNumRunningJobs());
                         setNumQueuedJobs(event.getOffset(),loadState.getNumQueuedJobs());
-                        prevSnapshotOffset = event.getOffset();
                     }
                      
                 }
@@ -250,15 +256,17 @@ public class Timeline {
 //      snapshotState.printGridState();
 //      
 //      loadState.printDifferences(snapshotState);
-        
-        prevSnapshotOffset = snapshotOffset;
     }
     
     private synchronized boolean addEvent(Event event) {
-        
-        // Sanity check
-        assert event.getOffset()>getOffset(penultimateSnapshot.getSamplingTime()) : "Event occurs before the previous snapshot: "+event;
-        assert event.getOffset()<=getOffset(ultimateSnapshot.getSamplingTime()) : "Event occurs after the current snapshot: "+event;
+                
+        // Sanity checks
+        if (event.getOffset()<=penultimateOffset) {
+            log.warn("{} occurs before the previous snapshot at {}",event,penultimateOffset);
+        }
+        if (event.getOffset()>ultimateOffset) {
+            log.warn("{} occurs after the current snapshot at {}",event,ultimateOffset);
+        }
         
         if (event instanceof GridEvent) {
             GridEvent gridEvent = (GridEvent)event;
@@ -334,12 +342,12 @@ public class Timeline {
     }
     
     public synchronized long getLength() {
-        if (lastSnapshotDate==null) return 0;
+        if (ultimateSnapshot==null) return 0;
         Snapshot firstSnapshot = snapshots.peek();
         if (firstSnapshot==null) return 0;
         long lastOffset = eventMap.isEmpty()?0:eventMap.lastKey();
         long length1 = lastOffset - getOffset(firstSnapshot.getSamplingTime());
-        long length2 = (lastSnapshotDate.getTime() - firstSnapshot.getSamplingTime().getTime());
+        long length2 = (ultimateSnapshot.getSamplingTime().getTime() - firstSnapshot.getSamplingTime().getTime());
         return Math.max(length1, length2);
     }
 
