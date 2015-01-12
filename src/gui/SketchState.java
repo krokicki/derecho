@@ -922,7 +922,7 @@ public class SketchState implements Runnable {
             log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets with "+slice.size()+" grid events",start,end);
         }
         else if (!eventSlice.isEmpty()) {
-            log.info("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
+            log.trace("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
         }
         
         return slice;
