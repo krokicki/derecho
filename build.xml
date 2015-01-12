@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<project name="Derecho" default="dist">
+<project name="Derecho" default="dist-all">
  
     <!-- These 2 lines are required for AppBundler -->
     <taskdef name="bundleapp" classname="com.oracle.appbundler.AppBundlerTask" classpath="lib/appbundler-1.0.jar" />
@@ -74,7 +74,7 @@
 
     </target>
 
-    <target name="dist" depends="build-jar">
+    <target name="dist-linux" depends="build-jar">
 
         <delete dir="${final.dir}" />
         <mkdir dir="${final.dir}" />
@@ -96,7 +96,7 @@
         
     </target>
  
-    <target name="dist-mac" depends="dist">
+    <target name="dist-mac" depends="dist-linux">
 
         <!-- Unfortunately, AppBundler does not support arbitrary files on the classpath, 
              so we need to group the config files into a jar and include that -->
@@ -139,5 +139,7 @@
 
      </target>
 
+    <target name="dist-all" depends="dist-mac">
+    </target>
 
 </project>
