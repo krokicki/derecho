@@ -2,7 +2,7 @@
 <project name="Derecho" default="dist">
  
     <!-- These 2 lines are required for AppBundler -->
-    <taskdef name="bundleapp" classname="com.oracle.appbundler.AppBundlerTask" />
+    <taskdef name="bundleapp" classname="com.oracle.appbundler.AppBundlerTask" classpath="lib/appbundler-1.0.jar" />
     <property environment="env" />
 
     <property name="src.dir" value="${basedir}/src" />
