@@ -43,6 +43,9 @@ public class GridSketch extends PApplet {
     private static final String MAIN_CLASS = GridSketch.class.getName();
     private static final long LIVE_POLL_INTERVAL_SECONDS = ConfigProperties.getInteger("derecho.data.poll.secs",5);
     private static final int MAX_DRAWING_ERRORS = 5;
+
+    // Draw the graph by default?
+    private boolean isDrawGraphDefault = ConfigProperties.getBoolean("derecho.viz.draw.graph",true);
     
     private final boolean TIMER = false;
     private final boolean bufferAllBeforePlaying = true; 
@@ -55,6 +58,9 @@ public class GridSketch extends PApplet {
 
     private float appWidth;
     private float appHeight;
+
+    // Color schemes
+    private CColor currTimeSliderColor;
     
     // Controls
     private ControlP5 cp5;
@@ -67,6 +73,7 @@ public class GridSketch extends PApplet {
     // Play state
     private boolean isLive = true;
     private boolean isSummary = true;
+    private boolean isShowGraph = isDrawGraphDefault;
     private boolean initialLoadComplete = false;
     private boolean initialStartComplete = false; // has the animation ever been started?
     private float playSpeed = 1.0f;
@@ -230,13 +237,23 @@ public class GridSketch extends PApplet {
 	            cp5.addButton("setSummary")
 	                .setSwitch(true)
 	                .setPosition(40,65)
-	                .setSize(50,12)
+                    .setSize(45,12)
 	                .setCaptionLabel("Summary")
 	                .setColorBackground(sliderBarColor)
 	                .setColorForeground(sliderBarColor)
 	                .setColorActive(controllerActiveColor)
 	                .setGroup(optionsGroup);
-	            
+
+                cp5.addButton("setShowGraph")
+                    .setSwitch(isDrawGraphDefault)
+                    .setPosition(92,65)
+                    .setSize(40,12)
+                    .setCaptionLabel("Timeline")
+                    .setColorBackground(sliderBarColor)
+                    .setColorForeground(sliderBarColor)
+                    .setColorActive(controllerActiveColor)
+                    .setGroup(optionsGroup);
+                
 	            cp5.addButton("exitSketch")
 	                .setPosition(260,10)
 	                .setSize(24,12)
@@ -250,7 +267,8 @@ public class GridSketch extends PApplet {
             if (isLive) goLive();
             
             log.info("setup() complete");
-            
+
+            log.info("isDrawGraphDefault: "+isDrawGraphDefault);
             log.info("screenshotInterval: "+screenshotInterval);
             log.info("screenshotFile: "+screenshotFile);
             log.info("drawAnimations: "+drawAnimations);
@@ -307,17 +325,13 @@ public class GridSketch extends PApplet {
             
                 // Create color scheme for the timeline slider
                 ColorScheme colorScheme = sketchState.getColorScheme();
-                CColor ccolor = new CColor();
-                ccolor.setBackground(colorScheme.gridBackgroundColor);
-                ccolor.setForeground(colorScheme.timelineColor);
-                ccolor.setActive(colorScheme.timelineColor);
+                this.currTimeSliderColor = new CColor();
+                currTimeSliderColor.setBackground(colorScheme.gridBackgroundColor);
+                currTimeSliderColor.setForeground(colorScheme.timelineColor);
+                currTimeSliderColor.setActive(colorScheme.timelineColor);
                 
                 // Update the timeline slider's properties
-                sliderRect = sketchState.getGraphRect();
-                slider.setPosition(sliderRect.getPos());
-                slider.setSize((int)sliderRect.getWidth(), (int)sliderRect.getHeight());
-                slider.setRange(timeline.getFirstOffset(),timeline.getLastOffset());
-                slider.setColor(ccolor);
+                updateSliderProperties();
                 
                 // Interpret the user clicking on the timeline slider
                 boolean sliderPressed = false;
@@ -494,7 +508,25 @@ public class GridSketch extends PApplet {
         }
         sketchState.setCurrentSubsetName(currSubset);
     }
+    
+    private void updateSliderProperties() {
+        Slider slider = (Slider)cp5.getController("currTime");
+        sliderRect = sketchState.getGraphRect();
 
+        if (!isShowGraph) {
+            float graphWindowWidth = sliderRect.getWidth();
+            float graphWindowHeight = 10;
+            float graphWindowX = sliderRect.getBounds().minX;
+            float graphWindowY = height-graphWindowHeight-graphWindowX;
+            sliderRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight);
+        }
+        
+        slider.setPosition(sliderRect.getPos());
+        slider.setSize((int)sliderRect.getWidth(), (int)sliderRect.getHeight());
+        slider.setRange(timeline.getFirstOffset(),timeline.getLastOffset());
+        slider.setColor(currTimeSliderColor);
+    }
+    
     private void updateProgressBar() {
         Slider slider = (Slider)cp5.getController("progress");
         float value = slider.getValue();
@@ -577,6 +609,15 @@ public class GridSketch extends PApplet {
         }
     }
     
+    public void setShowGraph(boolean ignore) {
+        Button button = (Button)cp5.getController("setShowGraph");
+        if (button!=null) {
+            this.isShowGraph = button.isOn();
+            sketchState.setShowGraph(isShowGraph);
+            updateSliderProperties();
+        }
+    }
+    
     public void exitSketch() {
         System.exit(0);
     }
@@ -590,7 +631,8 @@ public class GridSketch extends PApplet {
         
         this.timeline = new Timeline();
         this.sketchState = new SketchState(this, timeline, appWidth, appHeight);
-        
+        sketchState.setShowGraph(isDrawGraphDefault);
+
         // Reset the play speed
         this.playSpeed = 1.0f;
         sketchState.setPlaySpeed(playSpeed);
@@ -610,6 +652,19 @@ public class GridSketch extends PApplet {
 	        }
         }
         
+        Button graphButton = (Button)cp5.getController("setShowGraph");
+        if (graphButton!=null) {
+            if (!graphButton.isOn() && isShowGraph) {
+                graphButton.setOn();
+            }
+            else if (graphButton.isOn() && !isShowGraph) {
+                graphButton.setOff();
+            }
+            else {
+                sketchState.setShowGraph(isShowGraph);
+            }
+        }
+
         Button isLiveButton = (Button)cp5.getController("setIsLive");
         if (isLiveButton!=null) {
 	        if (!isLiveButton.isOn()) {

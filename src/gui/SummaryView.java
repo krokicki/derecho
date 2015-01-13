@@ -26,17 +26,20 @@ public class SummaryView implements Drawable {
     private Rectangle rect;
     private int fontHeight;
     private PFont font;
-    private float padding = 10;
+    private float padding = 0;
     private float boxPadding = 5;
     private float xSpacing = 20;
     private float ySpacing = 10;
     private float lineSpacing = 5;
-    
+    private boolean alignToMiddle = true;
+
     public SummaryView(Rectangle rect, PFont font, int fontHeight, Legend legend) {
         this.rect = rect;
         this.font = font;
         this.legend = legend;
         this.fontHeight = fontHeight;
+        this.ySpacing = fontHeight*1/2;
+        this.lineSpacing = fontHeight*1/3;
     }
     
     public void draw(PGraphics buf) {
@@ -56,7 +59,7 @@ public class SummaryView implements Drawable {
 
         buf.beginDraw();
         buf.textFont(font); // set this here so that font width calculations are accurate
-        FlowLayout layout = new FlowLayout(buf, xSpacing, ySpacing, padding);
+        FlowLayout layout = new FlowLayout(buf, xSpacing, ySpacing, padding, alignToMiddle);
         layout.drawInRegion(summaryViewMap.values(), rect);
         buf.endDraw();
     }
@@ -163,9 +166,18 @@ public class SummaryView implements Drawable {
                 buf.text(line, ix, iy);
                 iy += fontHeight + lineSpacing;
             }
+
+            // Draw outline
+//            buf.noFill();
+//            buf.strokeWeight(1);
+//            Utils.stroke(buf, buf.color(255));
+//            rect.draw(buf);
             
             buf.endDraw();
         }
     }
 
+    public void setAlignToMiddle(boolean alignToMiddle) {
+        this.alignToMiddle = alignToMiddle;
+    }
 }

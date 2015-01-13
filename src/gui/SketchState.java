@@ -10,6 +10,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jogamp.graph.curve.tess.GraphVertex;
+
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -131,11 +133,11 @@ public class SketchState implements Runnable {
     private final float height;
     private final int nodeFontHeight;
     private final int legendFontHeight;
-    private final int statsFontHeight;
+    private final int graphFontHeight;
     private final int titleFontHeight;
     private final PFont nodeFont;
     private final PFont legendFont;
-    private final PFont statsFont;
+    private final PFont graphFont;
     private final PFont titleFont;
     
     // Sizing variables
@@ -152,6 +154,8 @@ public class SketchState implements Runnable {
     private float queuedJobWidth = 10;
     private float queuedJobSpacing = 3;
     private int queueItemsPerLine = 100;
+    private float graphHeightPct = .10f;
+    private float ruleWeight = 3;
     
     // Bounds
     private Rectangle gridRect;
@@ -186,6 +190,7 @@ public class SketchState implements Runnable {
     // Overall state
     private Timeline timeline;
     private boolean summaryMode = true;
+    private boolean showGraph = true;
     private boolean bwMode = false;
     
     // State for playing
@@ -217,20 +222,61 @@ public class SketchState implements Runnable {
     
     // Draw snapshot lines on the graphs?
     private boolean isDrawSnapshotLines = false;
-    
+
     public SketchState(PApplet p, Timeline timeline, float width, float height) {
         this.p = p;
         this.width = width;
         this.height = height;
         this.timeline = timeline;
-        this.nodeFontHeight = height<=1200 ? 8 : 10;
-        this.legendFontHeight = height<=1200 ? 12 : 14;
-        this.statsFontHeight = height<=1200 ? 12 : 14;
-        this.titleFontHeight = height<=1200 ? 14 : 32;
-        this.nodeFont = p.loadFont("LucidaConsole-"+nodeFontHeight+".vlw");
-        this.legendFont = p.loadFont("LucidaConsole-"+legendFontHeight+".vlw");
-        this.statsFont = p.loadFont("LucidaConsole-"+statsFontHeight+".vlw");
-        this.titleFont = p.loadFont("LucidaConsole-"+titleFontHeight+".vlw");
+
+        int nodeFontHeight;
+        int legendFontHeight;
+        int graphFontHeight;
+        int titleFontHeight;
+        
+        if (height<=1024) {
+            this.topPadding = 18;
+            this.padding = 8;
+            this.rectSpacing = 6;
+            nodeFontHeight = 8;
+            legendFontHeight = 10;
+            graphFontHeight = 10;
+            titleFontHeight = 12;
+            this.graphHeightPct = .14f;
+            this.ruleWeight = 1;
+        }
+        else if (height<=1200) {
+            this.topPadding = 25;
+            this.padding = 10;
+            this.rectSpacing = 8;
+            nodeFontHeight = 10;
+            legendFontHeight = 12;
+            graphFontHeight = 10;
+            titleFontHeight = 14;
+            this.graphHeightPct = .13f;
+            this.ruleWeight = 2;
+        }
+        else {
+            this.topPadding = 35;
+            this.padding = 20;
+            this.rectSpacing = 10;
+            nodeFontHeight = 10;
+            legendFontHeight = 14;
+            graphFontHeight = 14;
+            titleFontHeight = 32;
+            this.graphHeightPct = .14f;
+            this.ruleWeight = 3;
+        }
+
+        this.nodeFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.node",nodeFontHeight);
+        this.legendFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.legend",legendFontHeight);
+        this.graphFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.graph",graphFontHeight);
+        this.titleFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.title",titleFontHeight);
+        
+        this.nodeFont = p.loadFont("LucidaConsole-"+this.nodeFontHeight+".vlw");
+        this.legendFont = p.loadFont("LucidaConsole-"+this.legendFontHeight+".vlw");
+        this.graphFont = p.loadFont("LucidaConsole-"+this.graphFontHeight+".vlw");
+        this.titleFont = p.loadFont("LucidaConsole-"+this.titleFontHeight+".vlw");
     }
     
     //
@@ -554,12 +600,12 @@ public class SketchState implements Runnable {
         if (legend!=null) legend.setRect(legendRect);
         
         // Summary Window
-        this.summaryViewRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, graphRect.getWidth(), graphRect.getBounds().minY-gridRect.getBounds().maxY-2*rectSpacing);
+        this.summaryViewRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, graphRect.getWidth(), (graphRect.getBounds().minY-gridRect.getBounds().maxY-2*rectSpacing));
         if (summaryView!=null) summaryView.setRect(summaryViewRect);
         
         // Queue Window
         this.queuedJobWidth = slotWidth; 
-        this.queueRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, gridRect.getWidth(), legendRect.getBounds().minY - gridRect.getBounds().maxY - 2*rectSpacing);
+        this.queueRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, gridRect.getWidth(), legendRect.getBounds().minY-gridRect.getBounds().maxY-2*rectSpacing);
         this.queueItemsPerLine = (int)Math.round(queueRect.getWidth() / (queuedJobWidth+queuedJobSpacing));
     }
     
@@ -601,7 +647,7 @@ public class SketchState implements Runnable {
     }
 
     private PVector getQueuedPosition(String fullJobId, int i) {
-        if (isSummaryMode()) {
+        if (summaryMode) {
             GridJob job = state.getJobByFullId(fullJobId);
             String username = job.getOwner();
             Rectangle rect = summaryView.getUserRect(username);
@@ -630,7 +676,7 @@ public class SketchState implements Runnable {
 
         // Initialize Views
         this.legend = new Legend(null, legendFont, legendFontHeight);
-        this.summaryView = new SummaryView(null, statsFont, statsFontHeight, legend);
+        this.summaryView = new SummaryView(null, legendFont, legendFontHeight, legend);
 
         // Initialize Graphs
         Map<Long, Integer> runningJobsMap = timeline.getNumRunningJobsMap();
@@ -776,28 +822,38 @@ public class SketchState implements Runnable {
         // Grid Window
         this.gridRect = new Rectangle(gridPos.x, gridPos.y, gridWidth, gridHeight);
         
-        // Graph Window
-        float graphWindowWidth = gridWidth;
-        float graphWindowHeight = Math.round((float)height*.15);
-        float graphWindowX = padding;
-        float graphWindowY = height-graphWindowHeight-padding;
-        this.graphRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight); 
-
-        // Graph Body
-        float graphTopPadding =  Math.round((float)graphWindowHeight*.10);
-        float graphBodyWidth = graphWindowWidth;
-        float graphBodyHeight = graphWindowHeight-graphTopPadding*2;
-        float graphBodyX = graphWindowX;
-        float graphBodyY = graphWindowY+graphTopPadding;
-        this.graphBodyRect = new Rectangle(graphBodyX, graphBodyY, graphBodyWidth, graphBodyHeight);
-        Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyWidth, graphBodyHeight-10);
-        runningJobsGraph.setRect(graphPaddedRect);
-        queuedJobsGraph.setRect(graphPaddedRect);
+        resizeGraphWindow();
         
         // Recalculate the sizes of dynamic windows
         updateWindowSizes();
     }
     
+    private void resizeGraphWindow() {
+        
+        if (gridRect==null) return;
+        
+        // Graph Window
+        float graphWindowWidth = gridRect.getWidth();
+        float graphWindowHeight = Math.round((float)height*graphHeightPct);
+        float graphWindowX = padding;
+        float graphWindowY = height-graphWindowHeight-padding;
+        this.graphRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight); 
+    
+        // Graph Body
+        float graphTopPadding =  Math.round((float)graphWindowHeight*graphHeightPct);
+        float graphBodyWidth = graphWindowWidth;
+        float graphBodyHeight = graphWindowHeight-graphTopPadding*2;
+        float graphBodyX = graphRect.getBounds().minX;
+        float graphBodyY = graphRect.getBounds().minY+graphTopPadding;
+        this.graphBodyRect = new Rectangle(graphBodyX, graphBodyY, graphBodyWidth, graphBodyHeight);
+        
+        if (summaryView!=null) summaryView.setAlignToMiddle(showGraph);
+        
+        Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyRect.getWidth(), graphBodyRect.getHeight()-10);
+        runningJobsGraph.setRect(graphPaddedRect);
+        queuedJobsGraph.setRect(graphPaddedRect);
+    }
+
     private void updateState(long elapsed) {
         
         // TODO: update the NodeSprites, if any changed (went down or came up)
@@ -1285,22 +1341,24 @@ public class SketchState implements Runnable {
             }
         }
         
-        // Draw horizontal rules
-        Utils.stroke(offscreenBuffer, colorScheme.panelBorderColor);
-        float gridRuleY = gridRect.getBounds().maxY+rectSpacing;
-        float graphRuleY = legendRect.getBounds().maxY;
-        offscreenBuffer.strokeWeight(3);
-        offscreenBuffer.line(0, gridRuleY, width, gridRuleY);
-        offscreenBuffer.line(0, graphRuleY, width, graphRuleY);
-
         // Draw subset name as title
         offscreenBuffer.textAlign(PApplet.CENTER, PApplet.TOP);
         offscreenBuffer.textFont(titleFont);
         Utils.fill(offscreenBuffer, colorScheme.titleFontColor);    
         offscreenBuffer.text(currSubsetName, width/2, 10);
         
+        // Draw horizontal rules
+        Utils.stroke(offscreenBuffer, colorScheme.panelBorderColor);
+        float gridRuleY = gridRect.getBounds().maxY+rectSpacing/2;
+        float graphRuleY = graphRect.getBounds().minY-rectSpacing/2;
+        offscreenBuffer.strokeWeight(ruleWeight );
+        offscreenBuffer.line(0, gridRuleY, width, gridRuleY);
+
         // Draw graph window
-        drawGraphWindow(offscreenBuffer);
+        if (showGraph) {
+            offscreenBuffer.line(0, graphRuleY, width, graphRuleY);
+            drawGraphWindow(offscreenBuffer);
+        }
         
         // Draw outlines
         if (isDrawOutlines) {
@@ -1308,9 +1366,17 @@ public class SketchState implements Runnable {
             offscreenBuffer.strokeWeight(1);
             Utils.stroke(offscreenBuffer, outlineColor);
             gridRect.draw(offscreenBuffer);
-            queueRect.draw(offscreenBuffer);
-            legendRect.draw(offscreenBuffer);
-            graphRect.draw(offscreenBuffer);
+            if (summaryMode) {
+                summaryViewRect.draw(offscreenBuffer);
+            }
+            else {
+                queueRect.draw(offscreenBuffer);
+                legendRect.draw(offscreenBuffer);
+            }
+            if (showGraph) {
+                graphRect.draw(offscreenBuffer);
+                graphBodyRect.draw(offscreenBuffer);
+            }
         }
         
         offscreenBuffer.endDraw();
@@ -1322,19 +1388,23 @@ public class SketchState implements Runnable {
 
         offscreenGraphBuffer.background(0, 0);
 
-        if (isDrawSnapshotLines) {
-            offscreenGraphBuffer.strokeWeight(1);
-            Utils.stroke(offscreenGraphBuffer, colorScheme.gridBaseColor);
-            for(Snapshot snapshot : timeline.getSnapshots()) {
-                long offset = timeline.getOffset(snapshot.getSamplingTime());
-                float lineX = PApplet.map(offset, timeline.getFirstOffset(), timeline.getLastOffset(), 0, graphBodyRect.getWidth()-1);
-                offscreenGraphBuffer.line(lineX, 0, lineX, graphBodyRect.getHeight());
+        if (showGraph) {
+            
+            if (isDrawSnapshotLines) {
+                offscreenGraphBuffer.strokeWeight(1);
+                Utils.stroke(offscreenGraphBuffer, colorScheme.gridBaseColor);
+                for(Snapshot snapshot : timeline.getSnapshots()) {
+                    long offset = timeline.getOffset(snapshot.getSamplingTime());
+                    float lineX = PApplet.map(offset, timeline.getFirstOffset(), timeline.getLastOffset(), 0, graphBodyRect.getWidth()-1);
+                    offscreenGraphBuffer.line(lineX, 0, lineX, graphBodyRect.getHeight());
+                }
             }
+            
+            if (queuedJobsGraph!=null) queuedJobsGraph.draw(offscreenGraphBuffer);
+            if (runningJobsGraph!=null) runningJobsGraph.draw(offscreenGraphBuffer);
+
         }
         
-        if (queuedJobsGraph!=null) queuedJobsGraph.draw(offscreenGraphBuffer);
-        if (runningJobsGraph!=null) runningJobsGraph.draw(offscreenGraphBuffer);
-
         offscreenGraphBuffer.endDraw();
     }
     
@@ -1353,12 +1423,12 @@ public class SketchState implements Runnable {
         
         buf.beginDraw();        
         
-        // Graph legend
+        // Graph 
         
         float x = graphBodyRect.getPos().x+1;
-        float y = graphRect.getPos().y+1;
+        float y = graphRect.getPos().y+3;
         
-        buf.textFont(legendFont);
+        buf.textFont(graphFont);
         buf.textAlign(PApplet.LEFT, PApplet.CENTER);
         
         Utils.stroke(buf, runningJobsGraph.getColor());
@@ -1379,7 +1449,7 @@ public class SketchState implements Runnable {
         
         // Time labels
         
-        buf.textFont(legendFont);
+        buf.textFont(graphFont);
         Utils.stroke(buf, colorScheme.titleFontColor);
         Utils.fill(buf, colorScheme.titleFontColor);
 
@@ -1605,7 +1675,7 @@ public class SketchState implements Runnable {
             }
             
             if (queued) {
-            	if (isSummaryMode()) {
+            	if (summaryMode) {
             		buf.rect(pos.x, pos.y, summaryQueuedJobWidth, summaryQueuedJobWidth);
             	}
             	else {
@@ -1791,15 +1861,16 @@ public class SketchState implements Runnable {
             legend.setHighlightUsername(username);
         }
     }
-    
-    public boolean isSummaryMode() {
-        return summaryMode;
-    }
 
     public void setSummaryMode(boolean summaryMode) {
         this.summaryMode = summaryMode;
     }
-
+    
+    public void setShowGraph(boolean showGraph) {
+        this.showGraph = showGraph;
+        resizeGraphWindow();
+    }
+    
     public Multimap<String, JobSprite> getJobSprites() {
         synchronized (jobSpriteMap) {
             return ImmutableMultimap.copyOf(jobSpriteMap);

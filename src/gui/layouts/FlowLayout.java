@@ -21,11 +21,14 @@ public class FlowLayout {
     private float xSpacing;
     private float ySpacing;
     private float padding;
+    private boolean alignToMiddle;
     
-    public FlowLayout(PGraphics buf, float xSpacing, float ySpacing, float padding) {
+    public FlowLayout(PGraphics buf, float xSpacing, float ySpacing, float padding, boolean alignToMiddle) {
         this.buf = buf;
         this.xSpacing = xSpacing;
         this.ySpacing = ySpacing;
+        this.padding = padding;
+        this.alignToMiddle = alignToMiddle;
     }
     
     public void drawInRegion(Collection<? extends SizedDrawable> drawables, Rectangle region) {
@@ -57,7 +60,21 @@ public class FlowLayout {
         }
 
         // Draw all the rows
-        float iy = drawArea.getPos().y + (drawArea.getHeight()-height)/2;
+        float iy = drawArea.getPos().y;
+        if (alignToMiddle && height < drawArea.getHeight()) {
+            iy += (drawArea.getHeight()-height)/2;
+        }
+        
+        // If we are overflowing, try to mitigate it
+        float actualYSpacing = ySpacing;
+        if (height > drawArea.getHeight()) {
+            actualYSpacing = ySpacing/2;
+        }
+        else if (!alignToMiddle) {
+            // Add some extra padding since we've not overflowing
+            iy += 2;
+        }
+        
         for(Row row : rows) {
             float ix = drawArea.getPos().x + (drawArea.getWidth()-row.getWidth())/2;
             
@@ -68,7 +85,7 @@ public class FlowLayout {
             }
             
             // Move to next row
-            iy += row.getHeight() + ySpacing;
+            iy += row.getHeight() + actualYSpacing;
         }
     }
     
