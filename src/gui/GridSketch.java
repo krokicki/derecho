@@ -511,7 +511,9 @@ public class GridSketch extends PApplet {
     
     private void updateSliderProperties() {
         Slider slider = (Slider)cp5.getController("currTime");
+        if (slider==null || sketchState==null) return;
         sliderRect = sketchState.getGraphRect();
+        if (sliderRect==null) return;
 
         if (!isShowGraph) {
             float graphWindowWidth = sliderRect.getWidth();
@@ -523,8 +525,11 @@ public class GridSketch extends PApplet {
         
         slider.setPosition(sliderRect.getPos());
         slider.setSize((int)sliderRect.getWidth(), (int)sliderRect.getHeight());
-        slider.setRange(timeline.getFirstOffset(),timeline.getLastOffset());
         slider.setColor(currTimeSliderColor);
+
+        if (timeline!=null) {
+            slider.setRange(timeline.getFirstOffset(),timeline.getLastOffset());
+        }
     }
     
     private void updateProgressBar() {
@@ -701,6 +706,7 @@ public class GridSketch extends PApplet {
             public void onFailure(Throwable thrown) {
                 futureTimeline = null;
                 log.error("Error loading initial timeline",thrown);
+                thrown.printStackTrace();
                 System.err.println("Error connecting to database. Make sure that your database properties are " +
                 		"correctly configured and specified with -DAPP_CONFIG=your.properties, and your grid " +
                 		"configuration specified with -DGRID_CONFIG=your_config.xml");
