@@ -98,24 +98,6 @@
  
     <target name="dist-mac" depends="dist-linux">
 
-        <!-- Unfortunately, AppBundler does not support arbitrary files on the classpath, 
-             so we need to group the config files into a jar and include that -->
-
-        <mkdir dir="${final.dir}/config" />
-
-        <copy todir="${final.dir}/config" flatten="true">
-            <fileset dir="${basedir}">
-                <include name="*.properties" />
-            </fileset>
-            <fileset dir="${conf.dir}">
-                <include name="*.xml" />
-            </fileset>
-        </copy>
-
-        <jar destfile="${final.dir}/config.jar">
-            <fileset dir="${final.dir}/config" />
-        </jar>
-
         <bundleapp outputdirectory="${build.dir}"
                 name="Derecho"
                 displayname="Derecho"
@@ -128,7 +110,6 @@
             <!--<runtime dir="${env.JAVA_HOME}"/>-->
             <classpath dir="${final.dir}">
                 <include name="**/*.jar"/>
-                <include name="config.jar"/>
             </classpath>
             <option value="-da"/>
             <option value="-Xms512M"/>
@@ -136,6 +117,19 @@
             <option value="-DAPP_CONFIG=app.properties"/>
             <option value="-DGRID_CONFIG=grid_config.xml"/>
         </bundleapp>
+
+        <mkdir dir="${build.dir}/Derecho.app/Contents/Java/Classes" />
+
+        <!-- App Bundler has no abilily to add non-jars to the classpath, 
+             but putting these files in Contents/Java/Classes seems to work -->
+        <copy todir="${build.dir}/Derecho.app/Contents/Java/Classes" flatten="true">
+            <fileset dir="${basedir}">
+                <include name="*.properties" />
+            </fileset>
+            <fileset dir="${conf.dir}">
+                <include name="*.xml" />
+            </fileset>
+        </copy>
 
      </target>
 

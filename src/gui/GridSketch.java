@@ -24,7 +24,7 @@ import snapshot.MySQLBasedStateLoader;
 import snapshot.StateLoader;
 import timeline.Timeline;
 import util.ConfigProperties;
-
+import java.util.Properties;
 import com.google.common.util.concurrent.*;
 
 import controlP5.*;
@@ -37,6 +37,21 @@ import controlP5.*;
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
 public class GridSketch extends PApplet {
+
+    static {
+        // This is a hack to give Oracle's App Bundler the ability to use APP_PACKAGE
+        // as a system variable. We snatch the bundle path out of the class path and 
+        // inject it back into the properties for Logback to use in its configuration
+        // so that the log file is made inside the bundle and not in the user's home dir.
+        String classpath = System.getProperty("java.class.path");
+        if (classpath!=null) {
+            for(String path : classpath.split(":")) {
+                if (path.endsWith("Contents/Java/Classes")) {
+                    System.setProperty("APP_PACKAGE",path.replaceFirst("/Java/Classes",""));
+                }
+            }
+        }
+    }
 
     private static final Logger log = LoggerFactory.getLogger(GridSketch.class);
 
@@ -104,6 +119,7 @@ public class GridSketch extends PApplet {
 
     public static void main(String args[]) {
         boolean fullscreen = ConfigProperties.getBoolean("derecho.viz.fullscreen",true);
+
         if (fullscreen) {
             PApplet.main(new String[] { "--full-screen", MAIN_CLASS });
         }
