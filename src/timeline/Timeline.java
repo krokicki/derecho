@@ -37,8 +37,9 @@ public class Timeline {
     private static final Logger log = LoggerFactory.getLogger(Timeline.class);
     
     public static final int MAX_NUM_SNAPSHOTS = ConfigProperties.getInteger("derecho.data.max.snapshots",100);
-    public static final int MIN_SNAPSHOT_RESOLUTION_SECS = 300; // 5 mins
-    public static final long LIVE_LAG_MS = ConfigProperties.getInteger("derecho.data.live.delay.secs",30)*1000;
+    public static final long MIN_SNAPSHOT_RESOLUTION_MS = ConfigProperties.getInteger("derecho.data.min.snapshot.secs",360)*1000;
+    public static final long SNAPSHOT_DELTA_MS = ConfigProperties.getInteger("derecho.data.snapshot.delta.secs",60)*1000;
+    public static final long LIVE_LAG_MS = ConfigProperties.getInteger("derecho.data.live.delay.secs",130)*1000;
     
     // Loaded timeline 
     private Snapshot penultimateSnapshot;
@@ -94,7 +95,7 @@ public class Timeline {
         this.ultimateOffset = getOffset(ultimateSnapshot.getSamplingTime());
         
         long prevKeptSnapshotOffset = getOffset(snapshots.peekLast().getSamplingTime());
-        if (ultimateOffset-prevKeptSnapshotOffset > MIN_SNAPSHOT_RESOLUTION_SECS*1000) {
+        if (ultimateOffset-prevKeptSnapshotOffset > MIN_SNAPSHOT_RESOLUTION_MS) {
             snapshots.add(snapshot);
         }
         
@@ -360,15 +361,9 @@ public class Timeline {
     public synchronized long getLiveOffset() {
         if (penultimateSnapshot==null) return 0;
         if (ultimateSnapshot==null) return 0;
-        long lastOffset = getOffset(penultimateSnapshot.getSamplingTime());
-        long snapshotInterval = getOffset(ultimateSnapshot.getSamplingTime()) - lastOffset;
-        if (lastOffset==0) {
-            // Only loaded 2 snapshots, probably because they're very far apart, so we can force the "live" offset here.    
-            long liveOffset = snapshotInterval - MIN_SNAPSHOT_RESOLUTION_SECS*1000;
-            if (liveOffset<0) return 0;
-            return liveOffset;
-        }
-        return lastOffset - snapshotInterval - LIVE_LAG_MS;
+        long liveOffset =  ultimateOffset - LIVE_LAG_MS;
+        if (liveOffset<0) return 0;
+        return liveOffset;
     }
     
     public long getLastOffset() {
