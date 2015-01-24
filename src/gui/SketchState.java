@@ -861,7 +861,7 @@ public class SketchState implements Runnable {
         // Update the job sprites
         List<GridEvent> events = getNextSlice(elapsed);
         if (!events.isEmpty()) {
-            log.debug("Applying {} events",events.size());
+            log.info("Applying {} events",events.size());
             for(GridEvent event : events) {
                 applyEvent(event);
             }
@@ -936,7 +936,8 @@ public class SketchState implements Runnable {
         
         long start = prevElapsed;
         long end = totalElapsed;
-        
+        Long lastPlayedPosition = null; 
+                
         SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(start, end);
 
         if (!eventSlice.isEmpty()) {
@@ -956,6 +957,9 @@ public class SketchState implements Runnable {
                     	if (event instanceof GridEvent) {
                     		GridEvent gridEvent = (GridEvent)event;
                             log.trace("Got grid event {}",gridEvent);
+                            if (lastPlayedPosition==null || offset>lastPlayedPosition) {
+                                lastPlayedPosition = offset;
+                            }
         	                slice.add(gridEvent);
                     	}
                     	else if (event instanceof SnapshotEvent) {
@@ -970,11 +974,13 @@ public class SketchState implements Runnable {
             }
         }
 
+        // Move up the window just past the last position that is being played right now. 
+        // This avoids moving the window up when there might still be events that are added into it. 
+        if (lastPlayedPosition!=null) {
+            this.prevElapsed = lastPlayedPosition+1;
+        }
+        
         if (!slice.isEmpty()) {
-            // We only move the start of the window up when we find an event. This done because the database might
-            // have gaps if the incoming events cannot be processed in real-time. In that case, we don't want to 
-            // miss any events if they come late. 
-            this.prevElapsed = totalElapsed;
             log.debug("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets with "+slice.size()+" grid events",start,end);
         }
         else if (!eventSlice.isEmpty()) {
