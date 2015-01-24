@@ -24,10 +24,18 @@ import snapshot.MySQLBasedStateLoader;
 import snapshot.StateLoader;
 import timeline.Timeline;
 import util.ConfigProperties;
-import java.util.Properties;
-import com.google.common.util.concurrent.*;
 
-import controlP5.*;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+
+import controlP5.Button;
+import controlP5.CColor;
+import controlP5.ControlP5;
+import controlP5.Group;
+import controlP5.Slider;
 
 /**
  * The Derecho visualization reads the state of a compute cluster over time from a database and draws a continuous 
