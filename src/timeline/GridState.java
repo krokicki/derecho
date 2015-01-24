@@ -158,8 +158,9 @@ public class GridState {
             try {
                 SnapshotJob ssJob = event.getSnapshotJob();
                 GridJob gridJob = new GridJob(ssJob);
-                log.trace(name+" - {} - queued job {}",event.getOffset(),gridJob);
+                log.trace(name+" - {} - queuing job {}",event.getOffset(),gridJob);
                 addQueuedJob(gridJob);
+                log.debug(name+" - {} - queued job {}",event.getOffset(),stateJob);
             }
             catch (Exception e) {
                 log.error(name+" - could not sub job {}",fullJobId,e);
@@ -169,22 +170,24 @@ public class GridState {
         case START:
             try {
                 if (stateJob==null) {
-                    throw new IllegalStateException("Cannot start job which doesn't exist: "+fullJobId);
+                    log.error(name+" - {} - cannot start job which doesn't exist: {}",event.getOffset(),fullJobId);
+                    return false;
                 }
                 SnapshotJob snapshotJob = event.getSnapshotJob();
                 if (snapshotJob==null) {
-                    log.error(name+" - cannot start a null job for {}",event);
+                    log.error(name+" - cannot start a null job: {}",event);
                 }
                 else {
                     SnapshotNode snapshotNode = snapshotJob.getNode();
                     if (snapshotNode==null) {
-                        log.error(name+" - cannot start a job with a null node");   
+                        log.error(name+" - {} - cannot start a job with a null node: {}",event.getOffset(),fullJobId);   
                     }
                     else {
                         String nodeName = snapshotNode.getShortName();
                         GridNode stateNode = getNodeByShortName(nodeName);
                         if (stateNode==null) {
-                            throw new IllegalStateException("No such node in the state: "+nodeName);
+                            log.error(name+" - cannot start a job on non-existent node {}",nodeName);
+                            return false;
                         }
                         log.trace(name+" - starting job {} on node {}",stateJob,nodeName);
                         removeQueuedJob(stateJob);              
@@ -204,11 +207,14 @@ public class GridState {
         case END:
             try {
                 if (stateJob==null) {
-                    throw new IllegalStateException("Cannot end job which doesn't exist: "+fullJobId);
+                    log.error(name+" - {} - cannot end job which doesn't exist: {}",event.getOffset(),fullJobId);
+                    return false;
                 }
-                log.debug(name+" - {} - ended job {}",event.getOffset(),stateJob);
-                incrementSlots(stateJob.getOwner(), -1*stateJob.getSlots());
-                removeJob(stateJob);
+                else {
+                    log.debug(name+" - {} - ended job {}",event.getOffset(),stateJob);
+                    incrementSlots(stateJob.getOwner(), -1*stateJob.getSlots());
+                    removeJob(stateJob);
+                }
             }
             catch (Exception e) {
                 log.error(name+" - could not end job {}",fullJobId,e);
