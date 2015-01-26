@@ -861,7 +861,7 @@ public class SketchState implements Runnable {
         // Update the job sprites
         List<GridEvent> events = getNextSlice(elapsed);
         if (!events.isEmpty()) {
-            log.info("Applying {} events",events.size());
+            log.debug("Applying {} events",events.size());
             for(GridEvent event : events) {
                 applyEvent(event);
             }
