@@ -31,7 +31,7 @@ some code minor changes are probably inevitable. Please consider contributing yo
 
 ## Copyright and License
 
-Copyright 2013 Konrad Rokicki
+Copyright 2016 Konrad Rokicki
 
 Licensed under GPL Version 3 (the "License");
 you may not use this work except in compliance with the License.
