@@ -244,13 +244,8 @@ public class MySQLBasedStateLoader extends StateLoader {
 
                 String hard_request_name = rs.getString("hard_request_name");
                 if (hard_request_name!=null) {
-                	if ("exclusive".equals(hard_request_name)) {
+                	if (hard_request_name.contains("exclusive")) {
 	                    job.setExclusive(true);
-	                    job.setSlots(8);
-                	}
-                	else if ("hadoop_exclusive".equals(hard_request_name)) {
-                		job.setExclusive(true);
-	                    job.setSlots(16);
                 	}
                 }
 

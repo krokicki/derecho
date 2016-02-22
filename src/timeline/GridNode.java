@@ -32,6 +32,13 @@ public class GridNode {
     public List<Integer> assignJobToSlots(GridJob job) {
         List<Integer> indexes = new ArrayList<Integer>();
         int slotsLeft = job.getSlots();
+        
+        if (job.isExclusive()) {
+        	// Exclusive jobs attempt to take the entire node
+        	log.trace("Exclusive job needs {} slots, not {}",slots.length,slotsLeft);
+        	slotsLeft = slots.length;
+        }
+        
         Set<String> running = new HashSet<String>();
         for(int s=0; s<slots.length && slotsLeft>0; s++) {
             if (slots[s]==null) {
