@@ -1,5 +1,10 @@
 package timeline;
 
+/**
+ * An event at a given offset in the current time-line. 
+ *
+ * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
+ */
 public class Event {
 
     private Long offset;
