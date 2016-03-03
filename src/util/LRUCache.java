@@ -8,10 +8,10 @@ import java.util.Map;
  * 
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
-public class LRUCache<K,V> extends LinkedHashMap<K,V> {
+public class LRUCache<K, V> extends LinkedHashMap<K, V> {
 
     private int maxEntries;
-    
+
     public LRUCache(int maxEntries) {
         this.maxEntries = maxEntries;
     }
@@ -20,5 +20,5 @@ public class LRUCache<K,V> extends LinkedHashMap<K,V> {
     protected boolean removeEldestEntry(Map.Entry eldest) {
         return size() > maxEntries;
     }
-    
+
 }

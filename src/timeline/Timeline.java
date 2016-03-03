@@ -33,38 +33,38 @@ import com.google.common.collect.ImmutableSortedMap;
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
 public class Timeline {
-    
+
     private static final Logger log = LoggerFactory.getLogger(Timeline.class);
-    
-    public static final int MAX_NUM_SNAPSHOTS = ConfigProperties.getInteger("derecho.data.max.snapshots",100);
-    public static final long MIN_SNAPSHOT_RESOLUTION_MS = ConfigProperties.getInteger("derecho.data.min.snapshot.secs",360)*1000;
-    public static final long SNAPSHOT_DELTA_MS = ConfigProperties.getInteger("derecho.data.snapshot.delta.secs",60)*1000;
-    public static final long LIVE_LAG_MS = ConfigProperties.getInteger("derecho.data.live.delay.secs",130)*1000;
-    
-    // Loaded timeline 
+
+    public static final int MAX_NUM_SNAPSHOTS = ConfigProperties.getInteger("derecho.data.max.snapshots", 100);
+    public static final long MIN_SNAPSHOT_RESOLUTION_MS = ConfigProperties.getInteger("derecho.data.min.snapshot.secs", 360) * 1000;
+    public static final long SNAPSHOT_DELTA_MS = ConfigProperties.getInteger("derecho.data.snapshot.delta.secs", 60) * 1000;
+    public static final long LIVE_LAG_MS = ConfigProperties.getInteger("derecho.data.live.delay.secs", 130) * 1000;
+
+    // Loaded timeline
     private Snapshot penultimateSnapshot;
     private Snapshot ultimateSnapshot;
     private long penultimateOffset;
     private long ultimateOffset;
     private LinkedBlockingDeque<Snapshot> snapshots = new LinkedBlockingDeque<Snapshot>();
-    private ConcurrentSkipListMap<Long,List<Event>> eventMap = new ConcurrentSkipListMap<Long,List<Event>>();
+    private ConcurrentSkipListMap<Long, List<Event>> eventMap = new ConcurrentSkipListMap<Long, List<Event>>();
     private Date firstSnapshotDate;
-    
+
     // Offsets mapped to various time series
-    private Map<Long,Integer> numRunningJobsMap = new ConcurrentSkipListMap<Long,Integer>();
-    private Map<Long,Integer> numQueuedJobsMap = new ConcurrentSkipListMap<Long,Integer>();
-    
+    private Map<Long, Integer> numRunningJobsMap = new ConcurrentSkipListMap<Long, Integer>();
+    private Map<Long, Integer> numQueuedJobsMap = new ConcurrentSkipListMap<Long, Integer>();
+
     // State machine for loading
     private GridState loadState;
-    private ConcurrentSkipListMap<Long,List<Event>> snapshotEventMap = new ConcurrentSkipListMap<Long,List<Event>>();
-    private LRUCache<String,Long> eventCache = new LRUCache<String,Long>(100000);
+    private ConcurrentSkipListMap<Long, List<Event>> snapshotEventMap = new ConcurrentSkipListMap<Long, List<Event>>();
+    private LRUCache<String, Long> eventCache = new LRUCache<String, Long>(100000);
     private Integer numRunningJobs = null;
     private Integer numQueuedJobs = null;
-            
+
     public synchronized void addSnapshot(Snapshot snapshot) {
-        
-        if (snapshots.size()>=MAX_NUM_SNAPSHOTS) {
-            log.info("Removing first snapshot to keep total at "+MAX_NUM_SNAPSHOTS);
+
+        if (snapshots.size() >= MAX_NUM_SNAPSHOTS) {
+            log.info("Removing first snapshot to keep total at " + MAX_NUM_SNAPSHOTS);
             snapshots.pop();
             Snapshot newFirst = snapshots.peek();
             long snapshotOffset = getOffset(newFirst.getSamplingTime());
@@ -72,114 +72,114 @@ public class Timeline {
             trimIterator(numRunningJobsMap.keySet().iterator(), snapshotOffset);
             trimIterator(numQueuedJobsMap.keySet().iterator(), snapshotOffset);
         }
-        
+
         this.snapshotEventMap.clear();
         this.penultimateSnapshot = ultimateSnapshot;
         this.ultimateSnapshot = snapshot;
-        
-        if (firstSnapshotDate==null) {
+
+        if (firstSnapshotDate == null) {
             synchronized (this) {
                 this.firstSnapshotDate = snapshot.getSamplingTime();
                 long snapshotOffset = getOffset(snapshot.getSamplingTime());
-                this.loadState = new GridState(snapshot,"loadState");
+                this.loadState = new GridState(snapshot, "loadState");
                 snapshots.add(snapshot);
-                setNumRunningJobs(0,loadState.getNumRunningJobs());
-                setNumQueuedJobs(0,loadState.getNumQueuedJobs());
-                log.info("using snapshot {} as the basis",snapshotOffset);
+                setNumRunningJobs(0, loadState.getNumRunningJobs());
+                setNumQueuedJobs(0, loadState.getNumQueuedJobs());
+                log.info("using snapshot {} as the basis", snapshotOffset);
             }
             return;
         }
 
         // These offsets cannot be calculated until the firstSnapshotDate is known.
-        this.penultimateOffset = penultimateSnapshot==null?0:getOffset(penultimateSnapshot.getSamplingTime());
+        this.penultimateOffset = penultimateSnapshot == null ? 0 : getOffset(penultimateSnapshot.getSamplingTime());
         this.ultimateOffset = getOffset(ultimateSnapshot.getSamplingTime());
-        
+
         long prevKeptSnapshotOffset = getOffset(snapshots.peekLast().getSamplingTime());
-        if (ultimateOffset-prevKeptSnapshotOffset > MIN_SNAPSHOT_RESOLUTION_MS) {
+        if (ultimateOffset - prevKeptSnapshotOffset > MIN_SNAPSHOT_RESOLUTION_MS) {
             snapshots.add(snapshot);
         }
-        
+
         log.debug("---------------------------------------------------------------------");
-        log.info("Adding snapshot with offset={}",ultimateOffset);
+        log.info("Adding snapshot with offset={}", ultimateOffset);
         addEvent(new SnapshotEvent(ultimateOffset));
 
-        Map<Integer,Date> parallelJobStarts = snapshot.getParallelJobStarts();
+        Map<Integer, Date> parallelJobStarts = snapshot.getParallelJobStarts();
 
         // Compute a set of relevant job ids in this snapshot
         Set<String> ssJobIds = new HashSet<String>();
-        for(SnapshotNode node : snapshot.getNodes()) {          
-            for(SnapshotJob ssJob : node.getJobs()) {
+        for (SnapshotNode node : snapshot.getNodes()) {
+            for (SnapshotJob ssJob : node.getJobs()) {
                 ssJobIds.add(ssJob.getFullJobId());
             }
         }
-        for(SnapshotJob ssJob : snapshot.getQueuedJobs()) {
+        for (SnapshotJob ssJob : snapshot.getQueuedJobs()) {
             ssJobIds.add(ssJob.getFullJobId());
         }
-        
-        // Check all known jobs, and generate delete events for the ones that are no longer relevant. 
-        for(GridJob stateJob : loadState.getJobMap().values()) {
-            if (!ssJobIds.contains(stateJob.getFullJobId())) { 
+
+        // Check all known jobs, and generate delete events for the ones that are no longer relevant.
+        for (GridJob stateJob : loadState.getJobMap().values()) {
+            if (!ssJobIds.contains(stateJob.getFullJobId())) {
                 // Assume the job ended right after the last snapshot
-                long endOffset = penultimateOffset+1;
-                // Parallel queued jobs end when the parallel jobs start. Note the intentional use of jobId instead of 
-                // fullJobId since this is a parallel job. 
+                long endOffset = penultimateOffset + 1;
+                // Parallel queued jobs end when the parallel jobs start. Note the intentional use of jobId instead of
+                // fullJobId since this is a parallel job.
                 if (parallelJobStarts.containsKey(stateJob.getJobId())) {
                     long startOffset = getOffset(parallelJobStarts.get(stateJob.getJobId()));
-                    if (startOffset>endOffset) {
-                        // Don't move end events into the past, because they won't be processed 
+                    if (startOffset > endOffset) {
+                        // Don't move end events into the past, because they won't be processed
                         endOffset = startOffset;
                     }
                     else {
-                        log.warn("MPI queued job started in the past and we missed it: {}",stateJob);
+                        log.warn("MPI queued job started in the past and we missed it: {}", stateJob);
                     }
                 }
                 boolean e1 = addEvent(new GridEvent(EventType.END, endOffset, stateJob.getFullJobId()));
                 if (e1) {
-                    log.debug("    "+stateJob+" (known) ended at "+endOffset);
+                    log.debug("    " + stateJob + " (known) ended at " + endOffset);
                 }
             }
         }
 
         log.trace("Generating start events for running jobs...");
-        
-        for(SnapshotNode node : snapshot.getNodes()) {          
-            for(SnapshotJob ssJob : node.getJobs()) {
-                
+
+        for (SnapshotNode node : snapshot.getNodes()) {
+            for (SnapshotJob ssJob : node.getJobs()) {
+
                 GridJob stateJob = loadState.getJobByFullId(ssJob.getFullJobId());
-                if (stateJob==null) {
+                if (stateJob == null) {
                     // We're seeing this job for the first time
-                    if (ssJob.getStartTime()!=null) {
+                    if (ssJob.getStartTime() != null) {
                         long startOffset = getOffset(ssJob.getStartTime());
                         // It's already been started, so that means we missed the queuing
                         long queueOffset = startOffset;
-                        if (startOffset<penultimateOffset+1) startOffset=penultimateOffset+1;
-                        if (queueOffset<penultimateOffset+1) queueOffset=penultimateOffset+1;
-                        if (startOffset>ultimateOffset) startOffset=ultimateOffset;
-                        if (queueOffset>ultimateOffset) queueOffset=ultimateOffset;
-                        
+                        if (startOffset < penultimateOffset + 1) startOffset = penultimateOffset + 1;
+                        if (queueOffset < penultimateOffset + 1) queueOffset = penultimateOffset + 1;
+                        if (startOffset > ultimateOffset) startOffset = ultimateOffset;
+                        if (queueOffset > ultimateOffset) queueOffset = ultimateOffset;
+
                         boolean e1 = addEvent(new GridEvent(EventType.SUB, queueOffset, ssJob));
-                        boolean e2 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));  
+                        boolean e2 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));
                         if (e1) {
-                            log.debug("    "+ssJob+" (new) subbed at "+queueOffset);    
+                            log.debug("    " + ssJob + " (new) subbed at " + queueOffset);
                         }
                         if (e2) {
-                            log.debug("    "+ssJob+" (new) started at "+startOffset);
+                            log.debug("    " + ssJob + " (new) started at " + startOffset);
                         }
                     }
                     else {
-                        log.error("Job running on a node does not have a start time: "+ssJob);
+                        log.error("Job running on a node does not have a start time: " + ssJob);
                     }
                 }
                 else {
                     // We already know about this job
-                    if (stateJob.getStartTime()==null && ssJob.getStartTime()!=null) {
+                    if (stateJob.getStartTime() == null && ssJob.getStartTime() != null) {
                         // Job just started
                         long startOffset = getOffset(ssJob.getStartTime());
-                        if (startOffset<penultimateOffset+1) startOffset=penultimateOffset+1;
-                        if (startOffset>ultimateOffset) startOffset=ultimateOffset;
+                        if (startOffset < penultimateOffset + 1) startOffset = penultimateOffset + 1;
+                        if (startOffset > ultimateOffset) startOffset = ultimateOffset;
                         boolean e1 = addEvent(new GridEvent(EventType.START, startOffset, ssJob));
                         if (e1) {
-                            log.debug("    "+ssJob+" (known) started at "+startOffset); 
+                            log.debug("    " + ssJob + " (known) started at " + startOffset);
                         }
                     }
                 }
@@ -187,119 +187,118 @@ public class Timeline {
         }
 
         log.trace("Generating sub events for queued jobs...");
-        
-        for(SnapshotJob ssJob : snapshot.getQueuedJobs()) {
+
+        for (SnapshotJob ssJob : snapshot.getQueuedJobs()) {
 
             GridJob stateJob = loadState.getJobByFullId(ssJob.getFullJobId());
-            if (stateJob!=null) {
+            if (stateJob != null) {
                 // TODO: this should happen as an event
                 if (stateJob.update(ssJob)) {
-                    log.debug("Job's internal state was updated: {}",ssJob.getFullJobId());
+                    log.debug("Job's internal state was updated: {}", ssJob.getFullJobId());
                 }
             }
             else {
-                // New job we've never seen before. 
+                // New job we've never seen before.
                 stateJob = new GridJob(ssJob);
-                long subOffset = getOffset(stateJob.getSubTime()==null?stateJob.getStartTime():stateJob.getSubTime());
+                long subOffset = getOffset(stateJob.getSubTime() == null ? stateJob.getStartTime() : stateJob.getSubTime());
                 // Submission was before this snapshot's range, so move it into range.
-                if (subOffset<penultimateOffset+1) subOffset=penultimateOffset+1;
-                if (subOffset>ultimateOffset) subOffset=ultimateOffset;
+                if (subOffset < penultimateOffset + 1) subOffset = penultimateOffset + 1;
+                if (subOffset > ultimateOffset) subOffset = ultimateOffset;
                 boolean e1 = addEvent(new GridEvent(EventType.SUB, subOffset, ssJob));
                 if (e1) {
-                    log.debug("    "+ssJob+" (new) subbed at "+subOffset);  
+                    log.debug("    " + ssJob + " (new) subbed at " + subOffset);
                 }
             }
         }
 
         log.trace("Will apply events to state..");
-        
+
         // Apply the events to the state
-        synchronized(this) {
-            
+        synchronized (this) {
+
             int errorsDetected = 0;
-            log.debug("Applying {} events",snapshotEventMap.size());
-            for(Long offset : snapshotEventMap.keySet()) {
-                for(Event event : snapshotEventMap.get(offset)) {
+            log.debug("Applying {} events", snapshotEventMap.size());
+            for (Long offset : snapshotEventMap.keySet()) {
+                for (Event event : snapshotEventMap.get(offset)) {
                     if (event instanceof GridEvent) {
-                        GridEvent gridEvent = (GridEvent)event;
-                        log.trace("Apply event: {}",gridEvent);
+                        GridEvent gridEvent = (GridEvent) event;
+                        log.trace("Apply event: {}", gridEvent);
                         if (!loadState.applyEvent(gridEvent)) {
                             errorsDetected++;
-                            log.error("Error applying event: {}",gridEvent);
+                            log.error("Error applying event: {}", gridEvent);
                         }
-                        setNumRunningJobs(event.getOffset(),loadState.getNumRunningJobs());
-                        setNumQueuedJobs(event.getOffset(),loadState.getNumQueuedJobs());
+                        setNumRunningJobs(event.getOffset(), loadState.getNumRunningJobs());
+                        setNumQueuedJobs(event.getOffset(), loadState.getNumQueuedJobs());
                     }
-                     
+
                 }
             }
 
-            if (errorsDetected>0) {
-                log.error("{} errors occured during event processing",errorsDetected);
-                
-//              printEventMap();
-                
-                GridState snapshotState = new GridState(snapshot,"Snapshot");
-                
-//              loadState.printGridState();
-//              snapshotState.printGridState();
-                
+            if (errorsDetected > 0) {
+                log.error("{} errors occured during event processing", errorsDetected);
+
+                // printEventMap();
+
+                GridState snapshotState = new GridState(snapshot, "Snapshot");
+
+                // loadState.printGridState();
+                // snapshotState.printGridState();
+
                 loadState.printDifferences(snapshotState);
             }
         }
-        
 
         if (log.isTraceEnabled()) printEventMap();
-//      
-//      GridState snapshotState = new GridState(snapshot,"Snapshot");
-//      
-//      loadState.printGridState();
-//      snapshotState.printGridState();
-//      
-//      loadState.printDifferences(snapshotState);
+        //
+        // GridState snapshotState = new GridState(snapshot,"Snapshot");
+        //
+        // loadState.printGridState();
+        // snapshotState.printGridState();
+        //
+        // loadState.printDifferences(snapshotState);
     }
-    
+
     private synchronized boolean addEvent(Event event) {
-                
+
         // Sanity checks
-        if (event.getOffset()<=penultimateOffset) {
-            log.warn("{} occurs before the previous snapshot at {}",event,penultimateOffset);
+        if (event.getOffset() <= penultimateOffset) {
+            log.warn("{} occurs before the previous snapshot at {}", event, penultimateOffset);
         }
-        if (event.getOffset()>ultimateOffset) {
-            log.warn("{} occurs after the current snapshot at {}",event,ultimateOffset);
+        if (event.getOffset() > ultimateOffset) {
+            log.warn("{} occurs after the current snapshot at {}", event, ultimateOffset);
         }
-        
+
         if (event instanceof GridEvent) {
-            GridEvent gridEvent = (GridEvent)event;
+            GridEvent gridEvent = (GridEvent) event;
             if (eventCache.containsKey(gridEvent.getCacheKey())) {
-                log.warn("Event was already cached: {}",gridEvent);
+                log.warn("Event was already cached: {}", gridEvent);
                 return false;
             }
             eventCache.put(gridEvent.getCacheKey(), event.getOffset());
         }
-        
+
         List<Event> events = eventMap.get(event.getOffset());
-        if (events==null) {
+        if (events == null) {
             events = Collections.synchronizedList(new ArrayList<Event>());
             eventMap.put(event.getOffset(), events);
-            log.info("Adding offset bucket {}",event.getOffset());
+            log.info("Adding offset bucket {}", event.getOffset());
         }
         synchronized (events) {
             events.add(event);
         }
-        
+
         List<Event> snapshotEvents = snapshotEventMap.get(event.getOffset());
-        if (snapshotEvents==null) {
+        if (snapshotEvents == null) {
             snapshotEvents = Collections.synchronizedList(new ArrayList<Event>());
             snapshotEventMap.put(event.getOffset(), snapshotEvents);
         }
         synchronized (snapshotEvents) {
             snapshotEvents.add(event);
         }
-        
+
         return true;
     }
-    
+
     public synchronized int getNumOffsets() {
         return eventMap.size();
     }
@@ -307,21 +306,21 @@ public class Timeline {
     public synchronized SortedSet<Long> getOffsets() {
         return eventMap.keySet();
     }
-    
+
     private void setNumRunningJobs(long offset, int numRunningJobs) {
         if (this.numRunningJobs == null || this.numRunningJobs != numRunningJobs) {
             numRunningJobsMap.put(offset, numRunningJobs);
         }
         this.numRunningJobs = numRunningJobs;
     }
-    
+
     private void setNumQueuedJobs(long offset, int numQueuedJobs) {
         if (this.numQueuedJobs == null || this.numQueuedJobs != numQueuedJobs) {
             numQueuedJobsMap.put(offset, numQueuedJobs);
         }
         this.numQueuedJobs = numQueuedJobs;
     }
-    
+
     public Map<Long, Integer> getNumRunningJobsMap() {
         return numRunningJobsMap;
     }
@@ -333,7 +332,7 @@ public class Timeline {
     public synchronized boolean isReady() {
         return firstSnapshotDate != null;
     }
-    
+
     public synchronized long getOffset(Date date) {
         return (date.getTime() - firstSnapshotDate.getTime());
     }
@@ -341,12 +340,12 @@ public class Timeline {
     public Date getBaselineDate() {
         return firstSnapshotDate;
     }
-    
+
     public synchronized long getLength() {
-        if (ultimateSnapshot==null) return 0;
+        if (ultimateSnapshot == null) return 0;
         Snapshot firstSnapshot = snapshots.peek();
-        if (firstSnapshot==null) return 0;
-        long lastOffset = eventMap.isEmpty()?0:eventMap.lastKey();
+        if (firstSnapshot == null) return 0;
+        long lastOffset = eventMap.isEmpty() ? 0 : eventMap.lastKey();
         long length1 = lastOffset - getOffset(firstSnapshot.getSamplingTime());
         long length2 = (ultimateSnapshot.getSamplingTime().getTime() - firstSnapshot.getSamplingTime().getTime());
         return Math.max(length1, length2);
@@ -354,26 +353,26 @@ public class Timeline {
 
     public synchronized long getFirstOffset() {
         Snapshot firstSnapshot = snapshots.peek();
-        if (firstSnapshot==null) return 0;
+        if (firstSnapshot == null) return 0;
         return getOffset(firstSnapshot.getSamplingTime());
     }
-    
+
     public synchronized long getLiveOffset() {
-        if (penultimateSnapshot==null) return 0;
-        if (ultimateSnapshot==null) return 0;
-        long liveOffset =  ultimateOffset - LIVE_LAG_MS;
-        if (liveOffset<0) return 0;
+        if (penultimateSnapshot == null) return 0;
+        if (ultimateSnapshot == null) return 0;
+        long liveOffset = ultimateOffset - LIVE_LAG_MS;
+        if (liveOffset < 0) return 0;
         return liveOffset;
     }
-    
+
     public long getLastOffset() {
-        return getFirstOffset()+getLength();
+        return getFirstOffset() + getLength();
     }
-    
-    public synchronized SortedMap<Long,List<Event>> getEvents(Long startOffset, Long endOffset) {
+
+    public synchronized SortedMap<Long, List<Event>> getEvents(Long startOffset, Long endOffset) {
         return ImmutableSortedMap.copyOf(eventMap.subMap(startOffset, endOffset));
     }
-    
+
     public synchronized List<Snapshot> getSnapshots() {
         return ImmutableList.copyOf(snapshots);
     }
@@ -381,33 +380,33 @@ public class Timeline {
     public synchronized Snapshot getLastLoadedSnapshot() {
         return ultimateSnapshot;
     }
-    
+
     private void trimIterator(Iterator<Long> iterator, long firstOffset) {
-        while(iterator.hasNext()) {
-            if (iterator.next()<firstOffset) {
+        while (iterator.hasNext()) {
+            if (iterator.next() < firstOffset) {
                 iterator.remove();
             }
         }
     }
-    
+
     private void printEventMap() {
         log.trace("Current Timeline:");
-        for(Long offset : eventMap.keySet()) {
+        for (Long offset : eventMap.keySet()) {
             List<Event> events = eventMap.get(offset);
-            for(Event event : events) {
+            for (Event event : events) {
                 if (event instanceof GridEvent) {
-                    GridEvent gridEvent = (GridEvent)event;
-                    log.trace(padRight(""+event.getOffset(), 10)+" "+gridEvent);
+                    GridEvent gridEvent = (GridEvent) event;
+                    log.trace(padRight("" + event.getOffset(), 10) + " " + gridEvent);
                 }
                 else if (event instanceof SnapshotEvent) {
-                    log.trace(padRight(""+event.getOffset(), 10)+" ---SNAPSHOT---"); 
+                    log.trace(padRight("" + event.getOffset(), 10) + " ---SNAPSHOT---");
                 }
                 else {
-                    log.error("Unknown event class: {}",event.getClass().getName());
+                    log.error("Unknown event class: {}", event.getClass().getName());
                 }
             }
         }
-        
+
     }
 
     public static String padRight(String s, int n) {

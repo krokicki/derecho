@@ -54,7 +54,7 @@ public class Rectangle {
     public Rectangle(float x, float y, float w, float h) {
         this(x, y, w, h, PApplet.LEFT, PApplet.TOP);
     }
-    
+
     public Rectangle(float x, float y, float w, float h, int mHorzAlign, int mVertAlign) {
         this.x = x;
         this.y = y;
@@ -86,11 +86,11 @@ public class Rectangle {
     public float getWidth() {
         return mWidth;
     }
-    
+
     public float getHeight() {
         return mHeight;
     }
-    
+
     public Bounds getBounds() {
         return bounds;
     }
@@ -150,8 +150,7 @@ public class Rectangle {
     @Override
     public String toString() {
         return "Rectangle [" + x + "," + y + ", "
-                + mWidth + "x" + mHeight +"]";
+                + mWidth + "x" + mHeight + "]";
     }
-    
-    
+
 }

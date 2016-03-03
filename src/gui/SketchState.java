@@ -1,16 +1,21 @@
 package gui;
 
-import gui.GridConfig.NodeConfiguration;
-import gui.GridConfig.NodeSubSet;
-import gui.Rectangle.Bounds;
-import ijeoma.motion.tween.NumberProperty;
-import ijeoma.motion.tween.Tween;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import jogamp.graph.curve.tess.GraphVertex;
 
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -20,13 +25,35 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import processing.core.*;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
+import com.google.common.collect.Ordering;
+
+import gui.GridConfig.NodeConfiguration;
+import gui.GridConfig.NodeSubSet;
+import gui.Rectangle.Bounds;
+import ijeoma.motion.tween.NumberProperty;
+import ijeoma.motion.tween.Tween;
+import processing.core.PApplet;
+import processing.core.PFont;
+import processing.core.PGraphics;
+import processing.core.PImage;
+import processing.core.PVector;
 import snapshot.Snapshot;
-import timeline.*;
+import timeline.Event;
+import timeline.GridEvent;
+import timeline.GridJob;
+import timeline.GridNode;
+import timeline.GridState;
+import timeline.SnapshotEvent;
+import timeline.Timeline;
 import util.ArrayUtils;
 import util.ConfigProperties;
-
-import com.google.common.collect.*;
 
 /**
  * The SketchState is a background thread responsible for drawing things which are relatively static to a buffer. 
@@ -44,7 +71,7 @@ public class SketchState implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(SketchState.class);
 
     private static final int SLOTS_PER_ROW = 4;
-    
+
     // Timing
     private static final float DURATION_JOB_SUB = 40.0f;
     private static final float DURATION_JOB_START = 20.0f;
@@ -56,7 +83,7 @@ public class SketchState implements Runnable {
     private static final int HEATMAP_SATURATION = 90;
     private static final int HEATMAP_MIN_HUE = 0;
     private static final int HEATMAP_MAX_HUE = 250;
-    
+
     public class ColorScheme {
         public int gridBackgroundColor;
         public int gridBaseColor;
@@ -102,7 +129,7 @@ public class SketchState implements Runnable {
             this.titleFontColor = gridBaseColor;
         }
     }
-    
+
     public class HeatmapColorScheme extends ColorScheme {
         HeatmapColorScheme() {
             this.gridBackgroundColor = Utils.color("000000");
@@ -118,16 +145,16 @@ public class SketchState implements Runnable {
             this.titleFontColor = gridBaseColor;
         }
     }
-    
+
     // Colors
     private ColorScheme colorScheme = new DefaultColorScheme();
     private final int laserColor = Utils.color("ff2222");
     private final int outlineColor = Utils.color("FFFFFF");
-    
+
     // Formatting
     private final DateTimeFormatter df = DateTimeFormat.forPattern("hh:mmaaa");
     private final DateTimeFormatter dfDate = DateTimeFormat.forPattern("MM/dd/yyyy");
-    
+
     // Invariants
     private final float width;
     private final float height;
@@ -139,7 +166,7 @@ public class SketchState implements Runnable {
     private final PFont legendFont;
     private final PFont graphFont;
     private final PFont titleFont;
-    
+
     // Sizing variables
     private float topPadding = 40;
     private float padding = 20;
@@ -156,7 +183,7 @@ public class SketchState implements Runnable {
     private int queueItemsPerLine = 100;
     private float graphHeightPct = .10f;
     private float ruleWeight = 3;
-    
+
     // Bounds
     private Rectangle gridRect;
     private Rectangle queueRect;
@@ -164,7 +191,7 @@ public class SketchState implements Runnable {
     private Rectangle summaryViewRect;
     private Rectangle graphRect;
     private Rectangle graphBodyRect;
-    
+
     // Buffers
     private PApplet p = null;
     private PGraphics offscreenBuffer = null;
@@ -175,29 +202,29 @@ public class SketchState implements Runnable {
     // Sprites
     private Legend legend;
     private SummaryView summaryView;
-    private Map<String,GridNodeArray> gridSubsets = new LinkedHashMap<String,GridNodeArray>();
-    private Map<String,NodeSprite> nodeSprites = new HashMap<String,NodeSprite>();
-    private Map<String,SlotSprite> slotSprites = new HashMap<String,SlotSprite>();
+    private Map<String, GridNodeArray> gridSubsets = new LinkedHashMap<String, GridNodeArray>();
+    private Map<String, NodeSprite> nodeSprites = new HashMap<String, NodeSprite>();
+    private Map<String, SlotSprite> slotSprites = new HashMap<String, SlotSprite>();
     private LinkedList<String> queuedJobs = new LinkedList<String>();
-    private Multimap<String, JobSprite> jobSpriteMap = Multimaps.synchronizedMultimap(HashMultimap.<String, JobSprite>create()); 
+    private Multimap<String, JobSprite> jobSpriteMap = Multimaps.synchronizedMultimap(HashMultimap.<String, JobSprite> create());
     private LineGraph runningJobsGraph;
     private LineGraph queuedJobsGraph;
-    
+
     // Heatmap tracking
-    private Map<String,Long> slotUsage = new HashMap<String,Long>();
-    private Map<String,Long> slotStartOffsets = new HashMap<String,Long>();
-    
+    private Map<String, Long> slotUsage = new HashMap<String, Long>();
+    private Map<String, Long> slotStartOffsets = new HashMap<String, Long>();
+
     // Overall state
     private Timeline timeline;
     private boolean summaryMode = true;
     private boolean showGraph = true;
     private boolean bwMode = false;
-    
+
     // State for playing
     private PlayState playState = PlayState.PAUSED;
     private GridState state;
     private String currSubsetName;
-    
+
     private double playSpeed = 1.0f;
     private long prevElapsed;
     private long totalElapsed = 0;
@@ -206,20 +233,20 @@ public class SketchState implements Runnable {
     private int maxGraphValue;
 
     // Draw outlines for UI components?
-    private boolean isDrawOutlines = ConfigProperties.getBoolean("derecho.viz.draw.outlines",false);
-    
+    private boolean isDrawOutlines = ConfigProperties.getBoolean("derecho.viz.draw.outlines", false);
+
     // Draw animations?
-    private boolean isDrawAnimations = ConfigProperties.getBoolean("derecho.viz.draw.animations",true);
-    
+    private boolean isDrawAnimations = ConfigProperties.getBoolean("derecho.viz.draw.animations", true);
+
     // Should changes to sprites be tweened? This is usually disabled during buffering, for example.
     private boolean tweenChanges = isDrawAnimations;
-    
+
     // Should jobs have lasers to show their intended routes?
     private boolean isDrawLaserTracking = false;
 
     // Show a heatmap instead of jobs?
     private boolean isHeatmap = false;
-    
+
     // Draw snapshot lines on the graphs?
     private boolean isDrawSnapshotLines = false;
 
@@ -233,8 +260,8 @@ public class SketchState implements Runnable {
         int legendFontHeight;
         int graphFontHeight;
         int titleFontHeight;
-        
-        if (height<=1024) {
+
+        if (height <= 1024) {
             this.topPadding = 18;
             this.padding = 8;
             this.rectSpacing = 6;
@@ -245,7 +272,7 @@ public class SketchState implements Runnable {
             this.graphHeightPct = .14f;
             this.ruleWeight = 1;
         }
-        else if (height<=1200) {
+        else if (height <= 1200) {
             this.topPadding = 25;
             this.padding = 10;
             this.rectSpacing = 8;
@@ -268,69 +295,71 @@ public class SketchState implements Runnable {
             this.ruleWeight = 3;
         }
 
-        this.nodeFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.node",nodeFontHeight);
-        this.legendFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.legend",legendFontHeight);
-        this.graphFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.graph",graphFontHeight);
-        this.titleFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.title",titleFontHeight);
-        
-        this.nodeFont = p.loadFont("LucidaConsole-"+this.nodeFontHeight+".vlw");
-        this.legendFont = p.loadFont("LucidaConsole-"+this.legendFontHeight+".vlw");
-        this.graphFont = p.loadFont("LucidaConsole-"+this.graphFontHeight+".vlw");
-        this.titleFont = p.loadFont("LucidaConsole-"+this.titleFontHeight+".vlw");
+        this.nodeFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.node", nodeFontHeight);
+        this.legendFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.legend", legendFontHeight);
+        this.graphFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.graph", graphFontHeight);
+        this.titleFontHeight = ConfigProperties.getInteger("derecho.viz.draw.font.title", titleFontHeight);
+
+        this.nodeFont = p.loadFont("LucidaConsole-" + this.nodeFontHeight + ".vlw");
+        this.legendFont = p.loadFont("LucidaConsole-" + this.legendFontHeight + ".vlw");
+        this.graphFont = p.loadFont("LucidaConsole-" + this.graphFontHeight + ".vlw");
+        this.titleFont = p.loadFont("LucidaConsole-" + this.titleFontHeight + ".vlw");
     }
-    
+
     //
-    //  --totalElapsed-
-    //  ----elapsed----
+    // --totalElapsed-
+    // ----elapsed----
     // |---------------|--------------------------------------------------------
-    // lastSliceDate   currDate
+    // lastSliceDate currDate
     //
     // --------totalElapsed------------
-    //                  ----elapsed----
+    // ----elapsed----
     // |---------------|---------------|----------------------------------------
-    //                 lastSliceDate   currDate
+    // lastSliceDate currDate
     //
     //
     // --------------totalElapsed----------------------
-    //                                  ----elapsed----
+    // ----elapsed----
     // |-------------------------------|---------------|------------------------
-    //                                 lastSliceDate   currDate
+    // lastSliceDate currDate
     //
-    
+
     @Override
     public void run() {
-        
+
         while (true) {
-            
+
             switch (playState) {
-            
+
             case BUFFERING:
                 bufferToNextPosition();
                 break;
-                
+
             case PLAYING:
                 Date currDate = new Date();
-                long elapsed = (int)((currDate.getTime() - lastSliceRequestDate.getTime()) * playSpeed);
+                long elapsed = (int) ((currDate.getTime() - lastSliceRequestDate.getTime()) * playSpeed);
                 this.lastSliceRequestDate = currDate;
-                this.maxGraphValue =  (runningJobsGraph.getGraphMap().isEmpty()||queuedJobsGraph.getGraphMap().isEmpty())?0:(Math.max(Collections.max(runningJobsGraph.getGraphMap().values()),Collections.max(queuedJobsGraph.getGraphMap().values())));
-                while (maxGraphValue%10>0 && maxGraphValue%5>0) {
+                this.maxGraphValue = (runningJobsGraph.getGraphMap().isEmpty() || queuedJobsGraph.getGraphMap().isEmpty()) ? 0
+                        : (Math.max(Collections.max(runningJobsGraph.getGraphMap().values()),
+                                Collections.max(queuedJobsGraph.getGraphMap().values())));
+                while (maxGraphValue % 10 > 0 && maxGraphValue % 5 > 0) {
                     maxGraphValue++;
                 }
-                
+
                 runningJobsGraph.setMaxValue(maxGraphValue);
                 queuedJobsGraph.setMaxValue(maxGraphValue);
-                
+
                 // Check if we've been truncated, and move forward if necessary
                 if (totalElapsed < timeline.getFirstOffset()) {
-                    log.info("Elapsed time ({}) occurs before the current timeline ({})",totalElapsed,timeline.getFirstOffset());
-                    
+                    log.info("Elapsed time ({}) occurs before the current timeline ({})", totalElapsed, timeline.getFirstOffset());
+
                     long position = elapsed;
                     boolean noMatch = true;
                     while (noMatch) {
                         if (position != timeline.getFirstOffset()) {
                             position = timeline.getFirstOffset();
                             try {
-                                Thread.sleep(500);  
+                                Thread.sleep(500);
                             }
                             catch (InterruptedException e) {
                                 // Ignore
@@ -340,19 +369,19 @@ public class SketchState implements Runnable {
                             noMatch = false;
                         }
                     }
-                    log.info("Will buffer to new position: {}",position);
+                    log.info("Will buffer to new position: {}", position);
                     bufferAtPosition(position);
                     break;
                 }
 
-                // Update sprites and build a usage map             
-                Map<String,Integer> slotsUsedByUser = new HashMap<String,Integer>();
-                Map<String,Integer> slotsQueuedByUser = new HashMap<String,Integer>();
+                // Update sprites and build a usage map
+                Map<String, Integer> slotsUsedByUser = new HashMap<String, Integer>();
+                Map<String, Integer> slotsQueuedByUser = new HashMap<String, Integer>();
                 Iterator<? extends Sprite> i = getJobSprites().values().iterator();
                 while (i.hasNext()) {
                     Sprite sprite = i.next();
                     if (sprite instanceof JobSprite) {
-                        JobSprite jobSprite = (JobSprite)sprite;
+                        JobSprite jobSprite = (JobSprite) sprite;
                         if (jobSprite.defunct) {
                             removeJobSprite(jobSprite);
                         }
@@ -362,7 +391,7 @@ public class SketchState implements Runnable {
                                 // If a job is queued then it is represented by a single sprite, so we need the
                                 // actual number of slots
                                 GridJob job = state.getJobByFullId(jobSprite.name);
-                                if (job!=null) {
+                                if (job != null) {
                                     slots = job.getSlots();
                                 }
                             }
@@ -376,11 +405,11 @@ public class SketchState implements Runnable {
                                         int start = Integer.parseInt(m.group(2));
                                         int end = Integer.parseInt(m.group(3));
                                         int interval = Integer.parseInt(m.group(4));
-                                        slots = (end-start)/interval;
+                                        slots = (end - start) / interval;
                                     }
-                                } 
+                                }
                                 catch (Exception e) {
-                                    log.error("Error parsing jobId: "+jobSprite.getName(),e);
+                                    log.error("Error parsing jobId: " + jobSprite.getName(), e);
                                 }
                             }
                             else if (jobSprite.getName().contains(",")) {
@@ -391,15 +420,15 @@ public class SketchState implements Runnable {
                                     if (m.matches()) {
                                         int first = Integer.parseInt(m.group(2));
                                         int second = Integer.parseInt(m.group(3));
-                                        //  There are two jobs listed here, so we require twice the number of slots
+                                        // There are two jobs listed here, so we require twice the number of slots
                                         slots *= 2;
                                     }
-                                } 
+                                }
                                 catch (Exception e) {
-                                    log.error("Error parsing jobId: "+jobSprite.getName(),e);
+                                    log.error("Error parsing jobId: " + jobSprite.getName(), e);
                                 }
                             }
-                            
+
                             String user = jobSprite.getUsername();
                             if (!slotsUsedByUser.containsKey(user)) {
                                 slotsUsedByUser.put(user, 0);
@@ -408,65 +437,65 @@ public class SketchState implements Runnable {
                                 slotsQueuedByUser.put(user, 0);
                             }
                             if (jobSprite.queued) {
-                                slotsQueuedByUser.put(user, slotsQueuedByUser.get(user)+slots);
+                                slotsQueuedByUser.put(user, slotsQueuedByUser.get(user) + slots);
                             }
                             else {
-                                slotsUsedByUser.put(user, slotsUsedByUser.get(user)+slots);
+                                slotsUsedByUser.put(user, slotsUsedByUser.get(user) + slots);
                             }
                         }
                     }
                 }
-                
+
                 legend.retain(slotsUsedByUser);
                 summaryView.retain(slotsUsedByUser, slotsQueuedByUser);
-                
+
                 updateWindowSizes();
                 recalculateQueuePacking();
                 updateState(elapsed);
                 updateOffscreenBuffer();
                 updateOffscreenGraphBuffer();
                 flipBuffers();
-                
+
                 break;
 
             case READY:
                 break;
-                
+
             case PAUSED:
                 break;
 
             case END:
                 return;
-                
+
             default:
-                log.error("Invalid play state: "+playState);
+                log.error("Invalid play state: " + playState);
                 break;
-                
+
             }
-            
+
             try {
-                Thread.sleep(50);   
+                Thread.sleep(50);
             }
             catch (InterruptedException e) {
                 // Ignore
             }
         }
     }
-    
+
     private void bufferToNextPosition() {
 
-        log.info("Buffering to next position: {}",nextStartingPosition);
-        
-        int i=0;
+        log.info("Buffering to next position: {}", nextStartingPosition);
+
+        int i = 0;
         Snapshot reqSnapshot = null;
         Snapshot prevSnapshot = null;
-        for(Snapshot snapshot : timeline.getSnapshots()) {
+        for (Snapshot snapshot : timeline.getSnapshots()) {
             long offset = timeline.getOffset(snapshot.getSamplingTime());
-            
-            log.debug("Snapshot {} has offset {}",i,offset);
-            
-            if (offset>=nextStartingPosition) {
-                if (prevSnapshot==null) {
+
+            log.debug("Snapshot {} has offset {}", i, offset);
+
+            if (offset >= nextStartingPosition) {
+                if (prevSnapshot == null) {
                     reqSnapshot = snapshot;
                 }
                 else {
@@ -477,40 +506,40 @@ public class SketchState implements Runnable {
             prevSnapshot = snapshot;
             i++;
         }
-        
-        if (reqSnapshot==null) {
+
+        if (reqSnapshot == null) {
             reqSnapshot = prevSnapshot;
-            if (reqSnapshot==null) {
-                log.error("Could not find snapshot for offset {}",nextStartingPosition);
+            if (reqSnapshot == null) {
+                log.error("Could not find snapshot for offset {}", nextStartingPosition);
                 setPlayState(PlayState.PAUSED);
                 return;
             }
         }
-        
+
         // Initialize the state at the closest possible snapshot
-        log.info("Init with snapshot with offset {}",timeline.getOffset(reqSnapshot.getSamplingTime()));
-        
-        this.state = new GridState(reqSnapshot,"runState");
+        log.info("Init with snapshot with offset {}", timeline.getOffset(reqSnapshot.getSamplingTime()));
+
+        this.state = new GridState(reqSnapshot, "runState");
         initState();
-        
+
         // Apply all events between the closet snapshot and the desired starting position
-        this.totalElapsed = timeline.getOffset((reqSnapshot.getSamplingTime()))+1;
+        this.totalElapsed = timeline.getOffset((reqSnapshot.getSamplingTime())) + 1;
         // This must be set before calling updateState for the first time after changing the position (i.e. totalElapsed)
         this.prevElapsed = totalElapsed;
         long elapsed = nextStartingPosition - totalElapsed;
-        if (elapsed<0) {
-            log.warn("Negative time elapsed. Normalizing to nextStartingPosition={}",nextStartingPosition);
+        if (elapsed < 0) {
+            log.warn("Negative time elapsed. Normalizing to nextStartingPosition={}", nextStartingPosition);
             totalElapsed = nextStartingPosition;
             elapsed = nextStartingPosition;
         }
-        
-        log.info("Buffering elapsed: {}",elapsed);
-        
+
+        log.info("Buffering elapsed: {}", elapsed);
+
         // Replay the events which happened between the snapshot position and the desired starting position
         if (isDrawAnimations) this.tweenChanges = false;
         updateState(elapsed);
         if (isDrawAnimations) this.tweenChanges = true;
-        
+
         // Get ready to start playing
         this.lastSliceRequestDate = new Date();
         if (totalElapsed != nextStartingPosition) {
@@ -518,68 +547,68 @@ public class SketchState implements Runnable {
         }
 
         setPlayState(PlayState.READY);
-        log.info("Buffered at totalElapsed={}",totalElapsed);
+        log.info("Buffered at totalElapsed={}", totalElapsed);
     }
-    
+
     public synchronized void bufferAtPosition(long position) {
-        if (playState==PlayState.PAUSED) {
+        if (playState == PlayState.PAUSED) {
             setPlayState(PlayState.BUFFERING);
             this.nextStartingPosition = position;
         }
         else {
-            log.error("Cannot transition from "+playState+" to BUFFERING");
+            log.error("Cannot transition from " + playState + " to BUFFERING");
         }
     }
-    
+
     public synchronized void play() {
-        if (playState==PlayState.PAUSED || playState==PlayState.READY) {
-            log.info("Beginning playback at totalElapsed={}",totalElapsed);
+        if (playState == PlayState.PAUSED || playState == PlayState.READY) {
+            log.info("Beginning playback at totalElapsed={}", totalElapsed);
             this.lastSliceRequestDate = new Date();
             setPlayState(PlayState.PLAYING);
         }
         else {
-            log.error("Cannot transition from "+playState+" to PLAYING");
+            log.error("Cannot transition from " + playState + " to PLAYING");
         }
     }
-    
+
     public synchronized void pause() {
-        if (playState==PlayState.PLAYING || playState==PlayState.PAUSED) {
+        if (playState == PlayState.PLAYING || playState == PlayState.PAUSED) {
             setPlayState(PlayState.PAUSED);
         }
         else {
-            log.error("Cannot transition from "+playState+" to PAUSED");
+            log.error("Cannot transition from " + playState + " to PAUSED");
         }
     }
-    
+
     public synchronized void end() {
         setPlayState(PlayState.END);
     }
-    
+
     private void setPlayState(PlayState playState) {
-        log.info("Entering state: {}",playState);
+        log.info("Entering state: {}", playState);
         this.playState = playState;
     }
 
     public boolean isPaused() {
-        return playState==PlayState.PAUSED;
+        return playState == PlayState.PAUSED;
     }
-    
+
     public boolean isReady() {
-        return playState==PlayState.READY;
+        return playState == PlayState.READY;
     }
-    
+
     public boolean isPlaying() {
-        return playState==PlayState.PLAYING;
+        return playState == PlayState.PLAYING;
     }
-    
+
     public boolean isBuffering() {
-        return playState==PlayState.BUFFERING;
+        return playState == PlayState.BUFFERING;
     }
 
     public boolean isEnded() {
-        return playState==PlayState.END;
+        return playState == PlayState.END;
     }
-    
+
     public double getPlaySpeed() {
         return playSpeed;
     }
@@ -591,41 +620,43 @@ public class SketchState implements Runnable {
     public long getPosition() {
         return totalElapsed;
     }
-    
+
     private void updateWindowSizes() {
 
-        // Legend Window 
-        float legendHeight = legend!=null ? legend.getHeight() : 10;
-        this.legendRect = new Rectangle(padding, graphRect.getBounds().minY-legendHeight-rectSpacing, graphRect.getWidth(), legendHeight);
-        if (legend!=null) legend.setRect(legendRect);
-        
+        // Legend Window
+        float legendHeight = legend != null ? legend.getHeight() : 10;
+        this.legendRect = new Rectangle(padding, graphRect.getBounds().minY - legendHeight - rectSpacing, graphRect.getWidth(), legendHeight);
+        if (legend != null) legend.setRect(legendRect);
+
         // Summary Window
-        this.summaryViewRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, graphRect.getWidth(), (graphRect.getBounds().minY-gridRect.getBounds().maxY-2*rectSpacing));
-        if (summaryView!=null) summaryView.setRect(summaryViewRect);
-        
+        this.summaryViewRect = new Rectangle(padding, gridRect.getBounds().maxY + rectSpacing, graphRect.getWidth(),
+                (graphRect.getBounds().minY - gridRect.getBounds().maxY - 2 * rectSpacing));
+        if (summaryView != null) summaryView.setRect(summaryViewRect);
+
         // Queue Window
-        this.queuedJobWidth = slotWidth; 
-        this.queueRect = new Rectangle(padding, gridRect.getBounds().maxY+rectSpacing, gridRect.getWidth(), legendRect.getBounds().minY-gridRect.getBounds().maxY-2*rectSpacing);
-        this.queueItemsPerLine = (int)Math.round(queueRect.getWidth() / (queuedJobWidth+queuedJobSpacing));
+        this.queuedJobWidth = slotWidth;
+        this.queueRect = new Rectangle(padding, gridRect.getBounds().maxY + rectSpacing, gridRect.getWidth(),
+                legendRect.getBounds().minY - gridRect.getBounds().maxY - 2 * rectSpacing);
+        this.queueItemsPerLine = (int) Math.round(queueRect.getWidth() / (queuedJobWidth + queuedJobSpacing));
     }
-    
+
     private void recalculateQueuePacking() {
 
         int total = 0;
-        for(String fullJobId : queuedJobs) {
+        for (String fullJobId : queuedJobs) {
             total += jobSpriteMap.get(fullJobId).size();
         }
-        
+
         float defaultSquare = slotWidth;
         float w = queueRect.getWidth();
-        float h = queueRect.getHeight() - 2*padding;
+        float h = queueRect.getHeight() - 2 * padding;
         float bestSquare = bestSquare(w, h, total) - queuedJobSpacing;
-        if (bestSquare>defaultSquare) bestSquare = defaultSquare;
+        if (bestSquare > defaultSquare) bestSquare = defaultSquare;
 
         queuedJobWidth = bestSquare;
-        queueItemsPerLine = (int)Math.round(queueRect.getWidth() / (queuedJobWidth+queuedJobSpacing));
+        queueItemsPerLine = (int) Math.round(queueRect.getWidth() / (queuedJobWidth + queuedJobSpacing));
     }
-    
+
     /**
      * Transliterated from Python solution available here: 
      * http://stackoverflow.com/questions/6463297/algorithm-to-fill-rectangle-with-small-squares
@@ -634,8 +665,8 @@ public class SketchState implements Runnable {
         float hi = Math.max(w, h);
         float lo = 0;
         while (Math.abs(hi - lo) > 0.0001) {
-            float mid = (lo+hi)/2;
-            float midval = (float)Math.floor(w / mid) * (float)Math.floor(h / mid);
+            float mid = (lo + hi) / 2;
+            float midval = (float) Math.floor(w / mid) * (float) Math.floor(h / mid);
             if (midval >= n) {
                 lo = mid;
             }
@@ -643,7 +674,7 @@ public class SketchState implements Runnable {
                 hi = mid;
             }
         }
-        return (int)Math.min(w/Math.floor(w/lo), h/Math.floor(h/lo));
+        return (int) Math.min(w / Math.floor(w / lo), h / Math.floor(h / lo));
     }
 
     private PVector getQueuedPosition(String fullJobId, int i) {
@@ -651,16 +682,16 @@ public class SketchState implements Runnable {
             GridJob job = state.getJobByFullId(fullJobId);
             String username = job.getOwner();
             Rectangle rect = summaryView.getUserRect(username);
-            if (rect!=null) { 
-                return new PVector(rect.getBounds().minX+(rect.getWidth()-queuedJobWidth)/2, rect.getBounds().minY);
+            if (rect != null) {
+                return new PVector(rect.getBounds().minX + (rect.getWidth() - queuedJobWidth) / 2, rect.getBounds().minY);
             }
         }
-        
-        float x = (queuedJobWidth + queuedJobSpacing) * ((float)i % (float)queueItemsPerLine);
-        float y = (queuedJobWidth + queuedJobSpacing) * (float)Math.floor((float)i / (float)queueItemsPerLine);
-        return PVector.add(queueRect.getPos(),new PVector(x,y+padding));
+
+        float x = (queuedJobWidth + queuedJobSpacing) * ((float) i % (float) queueItemsPerLine);
+        float y = (queuedJobWidth + queuedJobSpacing) * (float) Math.floor((float) i / (float) queueItemsPerLine);
+        return PVector.add(queueRect.getPos(), new PVector(x, y + padding));
     }
-    
+
     private void initState() {
 
         this.gridSubsets.clear();
@@ -671,8 +702,8 @@ public class SketchState implements Runnable {
         this.jobSpriteMap.clear();
         this.slotUsage.clear();
         this.slotStartOffsets.clear();
-        
-        this.nodeSpacing = (float)width / (float)400;
+
+        this.nodeSpacing = (float) width / (float) 400;
 
         // Initialize Views
         this.legend = new Legend(null, legendFont, legendFontHeight);
@@ -682,91 +713,91 @@ public class SketchState implements Runnable {
         Map<Long, Integer> runningJobsMap = timeline.getNumRunningJobsMap();
         Map<Long, Integer> queuedJobsMap = timeline.getNumQueuedJobsMap();
         this.runningJobsGraph = new LineGraph(null, timeline, runningJobsMap);
-        this.runningJobsGraph.setColor(colorScheme.graphLineColorRunningJobs); 
+        this.runningJobsGraph.setColor(colorScheme.graphLineColorRunningJobs);
         this.queuedJobsGraph = new LineGraph(null, timeline, queuedJobsMap);
         this.queuedJobsGraph.setColor(colorScheme.graphLineColorQueuedJobs);
 
         // Initialize the grid configuration
-    	GridConfig config = GridConfig.getInstance();
-    	for(NodeSubSet nodeSubSet : config.getSubSets()) {
-    		GridNodeArray subset = new GridNodeArray();
-        	gridSubsets.put(nodeSubSet.getName(), subset);
-            if (this.currSubsetName==null) {
-            	this.currSubsetName = nodeSubSet.getName();
+        GridConfig config = GridConfig.getInstance();
+        for (NodeSubSet nodeSubSet : config.getSubSets()) {
+            GridNodeArray subset = new GridNodeArray();
+            gridSubsets.put(nodeSubSet.getName(), subset);
+            if (this.currSubsetName == null) {
+                this.currSubsetName = nodeSubSet.getName();
             }
-    	}
-    	
+        }
+
         // Initialize sprites from the grid state
-    	for(GridNode node : state.getNodeMap().values()) {
-    		NodeConfiguration nodeConfig = config.getConfiguration(node.getShortName());
+        for (GridNode node : state.getNodeMap().values()) {
+            NodeConfiguration nodeConfig = config.getConfiguration(node.getShortName());
             String subsetName = nodeConfig.getNodeSet().getSubset().getName();
-    		int numSlots = nodeConfig.getNodeSet().getSlots();
-    		int i = nodeConfig.getCol();
-    		int j = nodeConfig.getRow();
+            int numSlots = nodeConfig.getNodeSet().getSlots();
+            int i = nodeConfig.getCol();
+            int j = nodeConfig.getRow();
             NodeSprite nodeSprite = createNodeSprite(null, node, numSlots);
-            
+
             nodeSprites.put(nodeSprite.name, nodeSprite);
-            for(SlotSprite slotSprite : nodeSprite.slots) {
+            for (SlotSprite slotSprite : nodeSprite.slots) {
                 slotSprites.put(slotSprite.name, slotSprite);
             }
-            
+
             GridNodeArray subset = gridSubsets.get(subsetName);
             subset.setNode(i, j, nodeSprite);
-            
+
             int s = 0;
-            for(GridJob job : node.getSlots()) {
-                if (job!=null) {
-                    log.trace("Init - Adding running job {}",job.getFullJobId());
-                    
+            for (GridJob job : node.getSlots()) {
+                if (job != null) {
+                    log.trace("Init - Adding running job {}", job.getFullJobId());
+
                     SlotSprite slotSprite = nodeSprite.slots[s];
                     JobSprite jobSprite = createJobSprite(job, slotSprite.pos);
                     jobSprite.slotSprite = slotSprite;
-                    
+
                     addJobSprite(jobSprite);
-                    
-                    log.debug("Init - Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
+
+                    log.debug("Init - Starting job {} on slot: {}", job.getFullJobId(), slotSprite.name);
                     slotStartOffsets.put(slotSprite.name, nextStartingPosition);
                 }
                 s++;
             }
-    	}
-        
-        for(GridJob job : state.getQueuedJobs()) {
-            log.debug("Init - Adding queued job {} for {}",job.getFullJobId(),job.getOwner());
-            JobSprite jobSprite = createJobSprite(job, null);            
+        }
+
+        for (GridJob job : state.getQueuedJobs()) {
+            log.debug("Init - Adding queued job {} for {}", job.getFullJobId(), job.getOwner());
+            JobSprite jobSprite = createJobSprite(job, null);
             jobSprite.queued = true;
             addJobSprite(jobSprite);
             queuedJobs.add(job.getFullJobId());
         }
-        
+
         resizeForSubset();
-        
+
         // Initialize Buffers
-        // The way this is done is very deliberate. The buffer needs to be fully initialized before being available 
-        // to the sketch. If begin/end draw is not called before the field is set, then we get null pointers from AWT. 
-        
-        PGraphics onscreenBuffer = p.createGraphics((int)width, (int)height, PGraphics.JAVA2D);
+        // The way this is done is very deliberate. The buffer needs to be fully initialized before being available
+        // to the sketch. If begin/end draw is not called before the field is set, then we get null pointers from AWT.
+
+        PGraphics onscreenBuffer = p.createGraphics((int) width, (int) height, PGraphics.JAVA2D);
         onscreenBuffer.smooth();
         onscreenBuffer.hint(PGraphics.ENABLE_NATIVE_FONTS);
         onscreenBuffer.beginDraw();
         onscreenBuffer.endDraw();
         this.onscreenBuffer = onscreenBuffer;
-        
-        PGraphics offscreenBuffer = p.createGraphics((int)width, (int)height, PGraphics.JAVA2D);
+
+        PGraphics offscreenBuffer = p.createGraphics((int) width, (int) height, PGraphics.JAVA2D);
         offscreenBuffer.smooth();
         offscreenBuffer.hint(PGraphics.ENABLE_NATIVE_FONTS);
         offscreenBuffer.beginDraw();
         offscreenBuffer.endDraw();
         this.offscreenBuffer = offscreenBuffer;
-        
-        PGraphics onscreenGraphBuffer = p.createGraphics((int)graphBodyRect.getWidth(), (int)graphBodyRect.getHeight(), PGraphics.JAVA2D);
+
+        PGraphics onscreenGraphBuffer = p.createGraphics((int) graphBodyRect.getWidth(), (int) graphBodyRect.getHeight(), PGraphics.JAVA2D);
         onscreenGraphBuffer.smooth();
         onscreenGraphBuffer.hint(PGraphics.ENABLE_NATIVE_FONTS);
         onscreenGraphBuffer.beginDraw();
         onscreenGraphBuffer.endDraw();
         this.onscreenGraphBuffer = onscreenGraphBuffer;
-        
-        PGraphics offscreenGraphBuffer = p.createGraphics((int)graphBodyRect.getWidth(), (int)graphBodyRect.getHeight(), PGraphics.JAVA2D);
+
+        PGraphics offscreenGraphBuffer = p.createGraphics((int) graphBodyRect.getWidth(), (int) graphBodyRect.getHeight(), PGraphics.JAVA2D);
         offscreenGraphBuffer.smooth();
         offscreenGraphBuffer.hint(PGraphics.ENABLE_NATIVE_FONTS);
         offscreenGraphBuffer.beginDraw();
@@ -777,105 +808,105 @@ public class SketchState implements Runnable {
     private void resizeForSubset() {
 
         // All sizes are defined in a specific order!
-    	GridNodeArray subset = gridSubsets.get(currSubsetName);
-    	int numRows = subset.getNumRows();
-    	int numCols = subset.getNumCols();
-    	int emptyRows = subset.getNumEmptyRows();
-    	int emptyCols = subset.getNumEmptyCols();
-        PVector gridPos = new PVector(padding, padding+topPadding);
+        GridNodeArray subset = gridSubsets.get(currSubsetName);
+        int numRows = subset.getNumRows();
+        int numCols = subset.getNumCols();
+        int emptyRows = subset.getNumEmptyRows();
+        int emptyCols = subset.getNumEmptyCols();
+        PVector gridPos = new PVector(padding, padding + topPadding);
 
         // Position grid nodes for the current subset
-        float gridWidth = width-2*padding;
-        float nodeWidth = ((gridWidth + nodeSpacing) / (numCols-emptyCols)) - nodeSpacing;
+        float gridWidth = width - 2 * padding;
+        float nodeWidth = ((gridWidth + nodeSpacing) / (numCols - emptyCols)) - nodeSpacing;
         this.slotWidth = slotHeight = (nodeWidth - slotSpacing * 5) / 4;
         float gridHeight = 0;
-        
-        for(int j=emptyRows; j<numRows; j++) {
-        	List<NodeSprite> row = subset.getRow(j);
-    		if (row==null || row.isEmpty()) continue;
-    		
-    		float rowMaxHeight = 0;
-    		
-	        for(int i=emptyCols; i<row.size(); i++) {
-	        	NodeSprite nodeSprite = row.get(i);
-	    		if (nodeSprite==null) continue;
-	    		int colNum = i-emptyCols;
-	    		
-	    		int slotRows = (int)Math.ceil((double)nodeSprite.slots.length / (double)SLOTS_PER_ROW);
-	            float nodeHeight = slotSpacing * (slotRows+1) + slotHeight * slotRows + nodeLabelHeight;
-	            
-	            // Keep track of the max height of any node in this row
-	            rowMaxHeight = Math.max(rowMaxHeight, nodeHeight);
-	            
-	            // Position each node
-        		PVector pos = new PVector((nodeWidth + nodeSpacing) * colNum, gridHeight);
-        		pos.add(gridPos);
-        		nodeSprite.setRect(new Rectangle(pos.x, pos.y, nodeWidth, nodeHeight));
-        	}
 
-        	gridHeight += rowMaxHeight + nodeSpacing;
-    	}
-        
+        for (int j = emptyRows; j < numRows; j++) {
+            List<NodeSprite> row = subset.getRow(j);
+            if (row == null || row.isEmpty()) continue;
+
+            float rowMaxHeight = 0;
+
+            for (int i = emptyCols; i < row.size(); i++) {
+                NodeSprite nodeSprite = row.get(i);
+                if (nodeSprite == null) continue;
+                int colNum = i - emptyCols;
+
+                int slotRows = (int) Math.ceil((double) nodeSprite.slots.length / (double) SLOTS_PER_ROW);
+                float nodeHeight = slotSpacing * (slotRows + 1) + slotHeight * slotRows + nodeLabelHeight;
+
+                // Keep track of the max height of any node in this row
+                rowMaxHeight = Math.max(rowMaxHeight, nodeHeight);
+
+                // Position each node
+                PVector pos = new PVector((nodeWidth + nodeSpacing) * colNum, gridHeight);
+                pos.add(gridPos);
+                nodeSprite.setRect(new Rectangle(pos.x, pos.y, nodeWidth, nodeHeight));
+            }
+
+            gridHeight += rowMaxHeight + nodeSpacing;
+        }
+
         // Subtract the last padding
         gridHeight -= nodeSpacing;
 
         // Grid Window
         this.gridRect = new Rectangle(gridPos.x, gridPos.y, gridWidth, gridHeight);
-        
+
         resizeGraphWindow();
-        
+
         // Recalculate the sizes of dynamic windows
         updateWindowSizes();
     }
-    
+
     private void resizeGraphWindow() {
-        
-        if (gridRect==null) return;
-        
+
+        if (gridRect == null) return;
+
         // Graph Window
         float graphWindowWidth = gridRect.getWidth();
-        float graphWindowHeight = Math.round((float)height*graphHeightPct);
+        float graphWindowHeight = Math.round((float) height * graphHeightPct);
         float graphWindowX = padding;
-        float graphWindowY = height-graphWindowHeight-padding;
-        this.graphRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight); 
-    
+        float graphWindowY = height - graphWindowHeight - padding;
+        this.graphRect = new Rectangle(graphWindowX, graphWindowY, graphWindowWidth, graphWindowHeight);
+
         // Graph Body
-        float graphTopPadding =  Math.round((float)graphWindowHeight*graphHeightPct);
+        float graphTopPadding = Math.round((float) graphWindowHeight * graphHeightPct);
         float graphBodyWidth = graphWindowWidth;
-        float graphBodyHeight = graphWindowHeight-graphTopPadding*2;
+        float graphBodyHeight = graphWindowHeight - graphTopPadding * 2;
         float graphBodyX = graphRect.getBounds().minX;
-        float graphBodyY = graphRect.getBounds().minY+graphTopPadding;
+        float graphBodyY = graphRect.getBounds().minY + graphTopPadding;
         this.graphBodyRect = new Rectangle(graphBodyX, graphBodyY, graphBodyWidth, graphBodyHeight);
-        
-        if (summaryView!=null) summaryView.setAlignToMiddle(showGraph);
-        
-        Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyRect.getWidth(), graphBodyRect.getHeight()-10);
+
+        if (summaryView != null) summaryView.setAlignToMiddle(showGraph);
+
+        Rectangle graphPaddedRect = new Rectangle(0, 5, graphBodyRect.getWidth(), graphBodyRect.getHeight() - 10);
         runningJobsGraph.setRect(graphPaddedRect);
         queuedJobsGraph.setRect(graphPaddedRect);
     }
 
     private void updateState(long elapsed) {
-        
+
         // TODO: update the NodeSprites, if any changed (went down or came up)
-        
+
         // Update the job sprites
         List<GridEvent> events = getNextSlice(elapsed);
         if (!events.isEmpty()) {
-            log.debug("Applying {} events",events.size());
-            for(GridEvent event : events) {
+            log.debug("Applying {} events", events.size());
+            for (GridEvent event : events) {
                 applyEvent(event);
             }
         }
-        
+
         // Clean up queue
         List<String> toRemove = new ArrayList<String>();
-        for(String jobIdString : queuedJobs) {
+        for (String jobIdString : queuedJobs) {
             GridJob job = state.getJobByFullId(jobIdString);
-            if (job==null) {
+            if (job == null) {
                 toRemove.add(jobIdString);
             }
         }
-        for(String jobIdString : toRemove) {
+        for (String jobIdString : toRemove) {
             queuedJobs.remove(jobIdString);
         }
 
@@ -885,255 +916,256 @@ public class SketchState implements Runnable {
                 GridJob j1 = state.getJobByFullId(jid1);
                 GridJob j2 = state.getJobByFullId(jid2);
                 ComparisonChain chain = ComparisonChain.start()
-                		.compareFalseFirst(j1==null, j2==null)
-                		.compare(j1.getSubTime(),j2.getSubTime(), Ordering.natural().nullsLast());
+                        .compareFalseFirst(j1 == null, j2 == null)
+                        .compare(j1.getSubTime(), j2.getSubTime(), Ordering.natural().nullsLast());
                 return chain.result();
             }
         });
-        
+
         // Relocate the remaining queued job sprites
         int i = 0;
         log.trace("---------------------------------");
-        for(String fullJobId : queuedJobs) {
-            
+        for (String fullJobId : queuedJobs) {
+
             GridJob job = state.getJobByFullId(fullJobId);
-            
+
             Collection<JobSprite> sprites = jobSpriteMap.get(fullJobId);
-            if (sprites==null) {
-                log.warn("No such queued job: {}",fullJobId);
+            if (sprites == null) {
+                log.warn("No such queued job: {}", fullJobId);
             }
             else {
-                if (sprites.size()>1) {
-                    log.warn("More than 1 queued job sprite with id: "+fullJobId);
+                if (sprites.size() > 1) {
+                    log.warn("More than 1 queued job sprite with id: " + fullJobId);
                 }
-                for(JobSprite jobSprite : sprites) {
+                for (JobSprite jobSprite : sprites) {
                     if (!jobSprite.queued) {
-                        log.warn("Unqueued job in queue: "+fullJobId);
+                        log.warn("Unqueued job in queue: " + fullJobId);
                         continue;
                     }
-                    jobSprite.pos = getQueuedPosition(fullJobId, i++);    
-                    log.trace("  Relocated job to y: {}\t{}",jobSprite.pos.y,job);
+                    jobSprite.pos = getQueuedPosition(fullJobId, i++);
+                    log.trace("  Relocated job to y: {}\t{}", jobSprite.pos.y, job);
                 }
             }
         }
-        
-        if (queuedJobs.size()!=state.getQueuedJobs().size()) {
-            log.warn("Queue size ("+queuedJobs.size()+") does not match state ("+state.getQueuedJobs().size()+")");
+
+        if (queuedJobs.size() != state.getQueuedJobs().size()) {
+            log.warn("Queue size (" + queuedJobs.size() + ") does not match state (" + state.getQueuedJobs().size() + ")");
         }
     }
-    
+
     private List<GridEvent> getNextSlice(long elapsed) {
-        
+
         List<GridEvent> slice = new ArrayList<GridEvent>();
-        if (elapsed<=0) return slice;
+        if (elapsed <= 0) return slice;
 
         this.totalElapsed += elapsed;
-        
-        if (prevElapsed>=totalElapsed) {
-            log.warn("No slice possible with (prevElapsed={}, totalElapsed={})",prevElapsed,totalElapsed);
+
+        if (prevElapsed >= totalElapsed) {
+            log.warn("No slice possible with (prevElapsed={}, totalElapsed={})", prevElapsed, totalElapsed);
             return slice;
         }
-        
+
         long start = prevElapsed;
         long end = totalElapsed;
-        Long lastPlayedPosition = null; 
-                
-        SortedMap<Long,List<Event>> eventSlice = timeline.getEvents(start, end);
+        Long lastPlayedPosition = null;
+
+        SortedMap<Long, List<Event>> eventSlice = timeline.getEvents(start, end);
 
         if (!eventSlice.isEmpty()) {
-            
-            for(Long offset : eventSlice.keySet()) {
-                log.trace("Got offset bucket {}",offset);
-                if (offset>=totalElapsed) {
-                    log.warn("Timeline returned grid events outside the requested frame: {}>{}",offset,totalElapsed);
+
+            for (Long offset : eventSlice.keySet()) {
+                log.trace("Got offset bucket {}", offset);
+                if (offset >= totalElapsed) {
+                    log.warn("Timeline returned grid events outside the requested frame: {}>{}", offset, totalElapsed);
                     break;
                 }
                 List<Event> events = eventSlice.get(offset);
                 synchronized (events) {
                     if (events.isEmpty()) {
-                        log.trace("Got empty offset bucket for offset {}",offset);
+                        log.trace("Got empty offset bucket for offset {}", offset);
                     }
-                    for(Event event : events) {
-                    	if (event instanceof GridEvent) {
-                    		GridEvent gridEvent = (GridEvent)event;
-                            log.trace("Got grid event {}",gridEvent);
-                            if (lastPlayedPosition==null || offset>lastPlayedPosition) {
+                    for (Event event : events) {
+                        if (event instanceof GridEvent) {
+                            GridEvent gridEvent = (GridEvent) event;
+                            log.trace("Got grid event {}", gridEvent);
+                            if (lastPlayedPosition == null || offset > lastPlayedPosition) {
                                 lastPlayedPosition = offset;
                             }
-        	                slice.add(gridEvent);
-                    	}
-                    	else if (event instanceof SnapshotEvent) {
-                    	    SnapshotEvent gridEvent = (SnapshotEvent)event;
-                            log.trace("Got snapshot event {}",gridEvent);
-                    	}
-                    	else {
-                            log.trace("Got unrecognized event {}",event);
-                    	}
+                            slice.add(gridEvent);
+                        }
+                        else if (event instanceof SnapshotEvent) {
+                            SnapshotEvent gridEvent = (SnapshotEvent) event;
+                            log.trace("Got snapshot event {}", gridEvent);
+                        }
+                        else {
+                            log.trace("Got unrecognized event {}", event);
+                        }
                     }
                 }
             }
         }
 
-        // Move up the window just past the last position that is being played right now. 
-        // This avoids moving the window up when there might still be events that are added into it. 
-        if (lastPlayedPosition!=null) {
-            this.prevElapsed = lastPlayedPosition+1;
+        // Move up the window just past the last position that is being played right now.
+        // This avoids moving the window up when there might still be events that are added into it.
+        if (lastPlayedPosition != null) {
+            this.prevElapsed = lastPlayedPosition + 1;
         }
-        
+
         if (!slice.isEmpty()) {
-            log.debug("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets with "+slice.size()+" grid events",start,end);
+            log.debug("Requested slice where {}<=t<{} and got " + eventSlice.size() + " buckets with " + slice.size() + " grid events", start, end);
         }
         else if (!eventSlice.isEmpty()) {
-            log.debug("Requested slice where {}<=t<{} and got "+eventSlice.size()+" buckets",start,end);
+            log.debug("Requested slice where {}<=t<{} and got " + eventSlice.size() + " buckets", start, end);
         }
-        
+
         return slice;
     }
-    
+
     private void applyEvent(GridEvent event) {
 
         String fullJobId = event.getJobId();
         GridJob job = state.getJobByFullId(fullJobId);
-        
+
         // Update the run state
         state.applyEvent(event);
-        
+
         // Update the sprite state
-        switch(event.getType()) {
+        switch (event.getType()) {
         case SUB:
-            if (job==null) {
+            if (job == null) {
                 job = new GridJob(event.getSnapshotJob());
             }
-            applySub(job);  
+            applySub(job);
             break;
         case START:
-            if (job==null) {
+            if (job == null) {
                 log.error("Cannot start null job");
             }
             else {
-                applyStart(job);    
+                applyStart(job);
             }
             break;
         case END:
-            if (job==null) {
+            if (job == null) {
                 log.error("Cannot end null job");
             }
             else {
-                applyEnd(job, event.getOffset());   
+                applyEnd(job, event.getOffset());
             }
             break;
         default:
-            log.warn("Unrecognized event type: {}",event.getType());
+            log.warn("Unrecognized event type: {}", event.getType());
             break;
         }
     }
-    
+
     private void applySub(GridJob job) {
 
         String fullJobId = job.getFullJobId();
         Collection<JobSprite> sprites = jobSpriteMap.get(fullJobId);
-        if (sprites!=null && !sprites.isEmpty()) {
-            log.warn("Ignoring sub event for known job {}",fullJobId);
+        if (sprites != null && !sprites.isEmpty()) {
+            log.warn("Ignoring sub event for known job {}", fullJobId);
             return;
         }
 
-        log.debug("Adding queued job {} for {}",job.getFullJobId(),job.getOwner());
-        
+        log.debug("Adding queued job {} for {}", job.getFullJobId(), job.getOwner());
+
         PVector pos = getQueuedPosition(fullJobId, queuedJobs.size());
         JobSprite jobSprite = createJobSprite(job, pos);
         jobSprite.opacity = 0;
         jobSprite.queued = true;
         addJobSprite(jobSprite);
         queuedJobs.add(fullJobId);
-        
+
         if (tweenChanges) {
-            Tween tween = new Tween("queue_job_"+fullJobId,getTweenDuration(DURATION_JOB_SUB))
-                .addProperty(new NumberProperty(jobSprite, "opacity", 255))
-                .call(jobSprite, "jobQueued")
-                .noAutoUpdate(); 
+            Tween tween = new Tween("queue_job_" + fullJobId, getTweenDuration(DURATION_JOB_SUB))
+                    .addProperty(new NumberProperty(jobSprite, "opacity", 255))
+                    .call(jobSprite, "jobQueued")
+                    .noAutoUpdate();
             jobSprite.addTween(tween);
         }
         else {
             jobSprite.opacity = 255;
         }
     }
-    
+
     private void applyStart(GridJob job) {
 
         String fullJobId = job.getFullJobId();
         Collection<JobSprite> sprites = jobSpriteMap.get(fullJobId);
         if (sprites.isEmpty()) {
-            log.warn("Starting job that was never subbed: {}",fullJobId);
+            log.warn("Starting job that was never subbed: {}", fullJobId);
             JobSprite jobSprite = createJobSprite(job, new PVector(0, 0));
             jobSprite.queued = true;
             addJobSprite(jobSprite);
             sprites = jobSpriteMap.get(fullJobId);
         }
 
-        if (job.getNode()==null) {
-            log.warn("No node for job being started: {}",fullJobId);
+        if (job.getNode() == null) {
+            log.warn("No node for job being started: {}", fullJobId);
             return;
         }
-        
+
         if (!queuedJobs.remove(job.getFullJobId())) {
-            log.warn("Starting job that was never queued: {}",fullJobId);
+            log.warn("Starting job that was never queued: {}", fullJobId);
         }
         else {
-            log.debug("Starting queued job {} on {}",fullJobId,job.getNode().getShortName());
+            log.debug("Starting queued job {} on {}", fullJobId, job.getNode().getShortName());
         }
-        
-        log.trace("# of sprites = {}, # queued jobs = {}",jobSpriteMap.size(),queuedJobs.size());
-        
+
+        log.trace("# of sprites = {}, # queued jobs = {}", jobSpriteMap.size(), queuedJobs.size());
+
         String nodeName = job.getNode().getShortName();
         NodeSprite nodeSprite = nodeSprites.get(nodeName);
-        
-        if (nodeSprite==null) {
-        	log.warn("Cannot start job on a node which has no sprite: "+nodeName);
-        	return;
+
+        if (nodeSprite == null) {
+            log.warn("Cannot start job on a node which has no sprite: " + nodeName);
+            return;
         }
-        
-        if (sprites.size()>1) {
-            log.warn("More than one sprite for job being started: "+fullJobId);
+
+        if (sprites.size() > 1) {
+            log.warn("More than one sprite for job being started: " + fullJobId);
         }
-        
+
         JobSprite jobSprite = sprites.iterator().next();
         jobSprite.queued = false;
-        
+
         boolean found = false;
-        
+
         int i = 0;
         GridJob[] nodeJobs = job.getNode().getSlots();
-        for(int s=0; s<nodeJobs.length; s++) {
-        	GridJob nodeJob = nodeJobs[s];
-            if (nodeJob==null) continue;
+        for (int s = 0; s < nodeJobs.length; s++) {
+            GridJob nodeJob = nodeJobs[s];
+            if (nodeJob == null) continue;
             if (!nodeJob.getFullJobId().equals(fullJobId)) continue;
             found = true;
-            
+
             SlotSprite slotSprite = nodeSprite.slots[s];
-            
-            if (slotStartOffsets.get(slotSprite.name)!=null) {
-                log.error("Error tracking slot start for jobId={}. Something on this slot was already started: {}",nodeJob.getFullJobId(),slotSprite.name);
+
+            if (slotStartOffsets.get(slotSprite.name) != null) {
+                log.error("Error tracking slot start for jobId={}. Something on this slot was already started: {}", nodeJob.getFullJobId(),
+                        slotSprite.name);
             }
 
-            log.debug("Starting job {} on slot: {}",job.getFullJobId(),slotSprite.name);
+            log.debug("Starting job {} on slot: {}", job.getFullJobId(), slotSprite.name);
             slotStartOffsets.put(slotSprite.name, timeline.getOffset(nodeJob.getStartTime()));
-            
-            if (i>0) {
+
+            if (i > 0) {
                 jobSprite = cloneJobSprite(fullJobId);
             }
-            
+
             jobSprite.slotSprite = slotSprite;
-            
+
             if (tweenChanges) {
                 // scale duration to the distance that needs to be traveled
                 float distance = jobSprite.pos.dist(slotSprite.pos);
                 float duration = (DURATION_JOB_START * distance / DISTANCE_JOB_START) * 0.6f;
-                
-                Tween tween = new Tween("start_job_"+fullJobId+"#"+i,getTweenDuration(duration))
-                    .addPVector(jobSprite.pos, slotSprite.pos.get())
-                    .call(jobSprite, "jobStarted")
-                    .setEasing(Tween.SINE_BOTH)
-                    .noAutoUpdate(); 
+
+                Tween tween = new Tween("start_job_" + fullJobId + "#" + i, getTweenDuration(duration))
+                        .addPVector(jobSprite.pos, slotSprite.pos.get())
+                        .call(jobSprite, "jobStarted")
+                        .setEasing(Tween.SINE_BOTH)
+                        .noAutoUpdate();
 
                 if (isDrawLaserTracking) {
                     jobSprite.endPos = slotSprite.pos.get();
@@ -1141,158 +1173,158 @@ public class SketchState implements Runnable {
                 jobSprite.addTween(tween);
             }
             else {
-        		jobSprite.setPos(slotSprite.pos);
+                jobSprite.setPos(slotSprite.pos);
             }
-            
+
             i++;
         }
-        
+
         if (!found) {
-            log.warn("Could not find assigned slot for job {}, deleting it.",fullJobId);
+            log.warn("Could not find assigned slot for job {}, deleting it.", fullJobId);
             jobSpriteMap.removeAll(fullJobId);
         }
     }
-    
+
     private void applyEnd(GridJob job, long endOffset) {
 
         String fullJobId = job.getFullJobId();
         Collection<JobSprite> sprites = jobSpriteMap.get(fullJobId);
-        if (sprites==null || sprites.isEmpty()) {
-            log.warn("Cannot end job that does not exist: {}",fullJobId);
+        if (sprites == null || sprites.isEmpty()) {
+            log.warn("Cannot end job that does not exist: {}", fullJobId);
             return;
         }
-        
-        if (job.getNode()==null) {
-            log.debug("Finishing queued job {}",fullJobId);
+
+        if (job.getNode() == null) {
+            log.debug("Finishing queued job {}", fullJobId);
         }
         else {
-            log.debug("Finishing job {} on node {}",fullJobId, job.getNode().getShortName());
+            log.debug("Finishing job {} on node {}", fullJobId, job.getNode().getShortName());
         }
 
         int i = 0;
-        for(JobSprite jobSprite : sprites) {
+        for (JobSprite jobSprite : sprites) {
 
-            if (jobSprite.slotSprite!=null) {
-            	String slotName = jobSprite.slotSprite.name;
+            if (jobSprite.slotSprite != null) {
+                String slotName = jobSprite.slotSprite.name;
                 Long startOffset = slotStartOffsets.get(slotName);
-                if (startOffset==null) {
-                    log.error("Error tracking slot end for jobId: {}. No start offset for slot: {}",fullJobId,slotName);
+                if (startOffset == null) {
+                    log.error("Error tracking slot end for jobId: {}. No start offset for slot: {}", fullJobId, slotName);
                 }
                 else {
                     long timeInUse = endOffset - startOffset;
                     Long currUse = slotUsage.get(slotName);
-                    if (currUse==null) currUse = 0L;
-                    if (timeInUse>0) {
-                        slotUsage.put(slotName, currUse+timeInUse);
+                    if (currUse == null) currUse = 0L;
+                    if (timeInUse > 0) {
+                        slotUsage.put(slotName, currUse + timeInUse);
                     }
                     slotStartOffsets.remove(slotName);
-                    log.debug("Removing job from slot: {}",slotName);
+                    log.debug("Removing job from slot: {}", slotName);
                 }
             }
-            
-            PVector endPos = new PVector(0,0);
-            if (jobSprite.pos!=null) {
-            	endPos = new PVector(jobSprite.pos.x, jobSprite.pos.y - 20);
+
+            PVector endPos = new PVector(0, 0);
+            if (jobSprite.pos != null) {
+                endPos = new PVector(jobSprite.pos.x, jobSprite.pos.y - 20);
             }
-            
+
             if (tweenChanges) {
-                Tween tween = new Tween("end_job_"+fullJobId+"#"+i,getTweenDuration(DURATION_JOB_END))
-                    .addPVector(jobSprite.pos, endPos)
-                    .addProperty(new NumberProperty(jobSprite, "opacity", 0))
-                    .call(jobSprite, "jobEnded")
-                    .noAutoUpdate(); 
-    
+                Tween tween = new Tween("end_job_" + fullJobId + "#" + i, getTweenDuration(DURATION_JOB_END))
+                        .addPVector(jobSprite.pos, endPos)
+                        .addProperty(new NumberProperty(jobSprite, "opacity", 0))
+                        .call(jobSprite, "jobEnded")
+                        .noAutoUpdate();
+
                 jobSprite.addTween(tween);
             }
             else {
                 jobSprite.jobEnded();
             }
-            
+
             i++;
         }
     }
-    
+
     private NodeSprite createNodeSprite(PVector pos, GridNode node, int numSlots) {
         NodeSprite nodeSprite = new NodeSprite(pos, node, numSlots);
         return nodeSprite;
     }
-    
+
     private JobSprite createJobSprite(GridJob job, PVector pos) {
         JobSprite jobSprite = new JobSprite(pos, job.getFullJobId(), job.getOwner());
         jobSprite.color = jobSprite.borderColor = legend.getItemColor(job.getOwner());
         jobSprite.borderColor = Utils.color("FFFFFF");
         jobSprite.name = job.getFullJobId();
-        jobSprite.tooltip = "Job #"+job.getFullJobId()+" for "+job.getOwner()+" ("+job.getSlots()+" slots)";
+        jobSprite.tooltip = "Job #" + job.getFullJobId() + " for " + job.getOwner() + " (" + job.getSlots() + " slots)";
         return jobSprite;
     }
 
     private void addJobSprite(JobSprite jobSprite) {
-    	log.trace("jobSpriteMap.put({}, {})",jobSprite.fullJobId,jobSprite.name);
+        log.trace("jobSpriteMap.put({}, {})", jobSprite.fullJobId, jobSprite.name);
         jobSpriteMap.put(jobSprite.fullJobId, jobSprite);
     }
-    
+
     private void removeJobSprite(JobSprite jobSprite) {
-    	log.trace("jobSpriteMap.remove({}, {})",jobSprite.fullJobId,jobSprite.name);
+        log.trace("jobSpriteMap.remove({}, {})", jobSprite.fullJobId, jobSprite.name);
         jobSpriteMap.remove(jobSprite.fullJobId, jobSprite);
     }
-    
+
     private JobSprite cloneJobSprite(String fullJobId) {
         Collection<JobSprite> sprites = jobSpriteMap.get(fullJobId);
-        if (sprites==null || sprites.isEmpty()) {
-            log.error("Cannot expand sprites for non-existing job: "+fullJobId);
+        if (sprites == null || sprites.isEmpty()) {
+            log.error("Cannot expand sprites for non-existing job: " + fullJobId);
             return null;
         }
-        
+
         // Try to find a non-clone to clone
         JobSprite jobSprite = null;
         for (JobSprite s : sprites) {
-    		jobSprite = s;
-        	if (!s.name.contains("#")) {
-        		break;
-        	}
+            jobSprite = s;
+            if (!s.name.contains("#")) {
+                break;
+            }
         }
-        
+
         GridJob job = state.getJobByFullId(fullJobId);
-        
+
         if (jobSprite.name.contains("#")) {
-        	log.warn("Cloning a clone: "+jobSprite.name);
+            log.warn("Cloning a clone: " + jobSprite.name);
         }
-        
-        if (job==null) {
-            log.error("Cannot expand sprites for unknown job: "+fullJobId);
+
+        if (job == null) {
+            log.error("Cannot expand sprites for unknown job: " + fullJobId);
             return null;
         }
-        
+
         JobSprite copy = jobSprite.copy();
-        copy.name += "#"+sprites.size();
+        copy.name += "#" + sprites.size();
         jobSpriteMap.put(fullJobId, copy);
         return copy;
     }
-    
+
     private float getTweenDuration(float durationJobSub) {
-        if (playSpeed<=1) return durationJobSub;
-        return durationJobSub/(float)Math.log(playSpeed);
+        if (playSpeed <= 1) return durationJobSub;
+        return durationJobSub / (float) Math.log(playSpeed);
     }
-    
+
     private void updateOffscreenBuffer() {
 
         offscreenBuffer.beginDraw();
         offscreenBuffer.background(colorScheme.gridBackgroundColor);
-        
+
         GridNodeArray subset = gridSubsets.get(currSubsetName);
         subset.draw(offscreenBuffer);
-        
+
         if (isHeatmap) {
-            
+
             // Draw heatmap color legend in the middle spot
             float barWidth = width * .5f;
             float barHeight = height * .02f;
-            float barX = (width - barWidth)/2;
-            float barY = queueRect.getBounds().minY + (queueRect.getHeight() - barHeight)/2;
-            
+            float barX = (width - barWidth) / 2;
+            float barY = queueRect.getBounds().minY + (queueRect.getHeight() - barHeight) / 2;
+
             Rectangle barRect = new Rectangle(barX, barY, barWidth, barHeight);
             Bounds b = barRect.getBounds();
-            for(float x=b.minX; x<=b.maxX; x++) {
+            for (float x = b.minX; x <= b.maxX; x++) {
                 offscreenBuffer.colorMode(PApplet.HSB, 360, 100, 100);
                 float hue = PApplet.map(x, b.minX, b.maxX, HEATMAP_MAX_HUE, HEATMAP_MIN_HUE);
                 int color = offscreenBuffer.color(hue, HEATMAP_BRIGHTNESS, HEATMAP_SATURATION);
@@ -1300,17 +1332,17 @@ public class SketchState implements Runnable {
                 Utils.fill(offscreenBuffer, color, 255);
                 offscreenBuffer.colorMode(PApplet.RGB);
                 offscreenBuffer.line(x, b.minY, x, b.maxY);
-            }        
-            
+            }
+
             offscreenBuffer.textFont(legendFont);
             Utils.stroke(offscreenBuffer, colorScheme.titleFontColor);
             Utils.fill(offscreenBuffer, colorScheme.titleFontColor);
             offscreenBuffer.textAlign(PApplet.LEFT, PApplet.TOP);
-            offscreenBuffer.text("0%", b.minX, b.maxY+5);
+            offscreenBuffer.text("0%", b.minX, b.maxY + 5);
             offscreenBuffer.textAlign(PApplet.RIGHT, PApplet.TOP);
-            offscreenBuffer.text("100%", b.maxX, b.maxY+5);
+            offscreenBuffer.text("100%", b.maxX, b.maxY + 5);
             offscreenBuffer.textAlign(PApplet.CENTER, PApplet.TOP);
-            offscreenBuffer.text("Percent Of Time In Use", width/2, b.maxY+5);
+            offscreenBuffer.text("Percent Of Time In Use", width / 2, b.maxY + 5);
         }
         else {
             if (summaryMode) {
@@ -1321,12 +1353,12 @@ public class SketchState implements Runnable {
                 Set<String> drawnUsers = new HashSet<String>();
                 Iterator<JobSprite> i = getJobSprites().values().iterator();
                 while (i.hasNext()) {
-                	JobSprite sprite = i.next();
+                    JobSprite sprite = i.next();
                     if (sprite.isStatic()) {
-                    	if (sprite.queued && !drawnUsers.contains(sprite.username)) {
-	                		drawnUsers.add(sprite.username);
-		                    sprite.draw(offscreenBuffer);
-                    	}
+                        if (sprite.queued && !drawnUsers.contains(sprite.username)) {
+                            drawnUsers.add(sprite.username);
+                            sprite.draw(offscreenBuffer);
+                        }
                     }
                 }
             }
@@ -1337,27 +1369,27 @@ public class SketchState implements Runnable {
                 // Draw queued jobs
                 Iterator<JobSprite> i = getJobSprites().values().iterator();
                 while (i.hasNext()) {
-                	JobSprite sprite = i.next();
+                    JobSprite sprite = i.next();
                     if (sprite.isStatic()) {
-                    	if (sprite.queued) {
-    	                    sprite.draw(offscreenBuffer);
-                    	}
+                        if (sprite.queued) {
+                            sprite.draw(offscreenBuffer);
+                        }
                     }
                 }
             }
         }
-        
+
         // Draw subset name as title
         offscreenBuffer.textAlign(PApplet.CENTER, PApplet.TOP);
         offscreenBuffer.textFont(titleFont);
-        Utils.fill(offscreenBuffer, colorScheme.titleFontColor);    
-        offscreenBuffer.text(currSubsetName, width/2, 10);
-        
+        Utils.fill(offscreenBuffer, colorScheme.titleFontColor);
+        offscreenBuffer.text(currSubsetName, width / 2, 10);
+
         // Draw horizontal rules
         Utils.stroke(offscreenBuffer, colorScheme.panelBorderColor);
-        float gridRuleY = gridRect.getBounds().maxY+rectSpacing/2;
-        float graphRuleY = graphRect.getBounds().minY-rectSpacing/2;
-        offscreenBuffer.strokeWeight(ruleWeight );
+        float gridRuleY = gridRect.getBounds().maxY + rectSpacing / 2;
+        float graphRuleY = graphRect.getBounds().minY - rectSpacing / 2;
+        offscreenBuffer.strokeWeight(ruleWeight);
         offscreenBuffer.line(0, gridRuleY, width, gridRuleY);
 
         // Draw graph window
@@ -1365,7 +1397,7 @@ public class SketchState implements Runnable {
             offscreenBuffer.line(0, graphRuleY, width, graphRuleY);
             drawGraphWindow(offscreenBuffer);
         }
-        
+
         // Draw outlines
         if (isDrawOutlines) {
             offscreenBuffer.noFill();
@@ -1384,10 +1416,10 @@ public class SketchState implements Runnable {
                 graphBodyRect.draw(offscreenBuffer);
             }
         }
-        
+
         offscreenBuffer.endDraw();
     }
-    
+
     private void updateOffscreenGraphBuffer() {
 
         offscreenGraphBuffer.beginDraw();
@@ -1395,25 +1427,25 @@ public class SketchState implements Runnable {
         offscreenGraphBuffer.background(0, 0);
 
         if (showGraph) {
-            
+
             if (isDrawSnapshotLines) {
                 offscreenGraphBuffer.strokeWeight(1);
                 Utils.stroke(offscreenGraphBuffer, colorScheme.gridBaseColor);
-                for(Snapshot snapshot : timeline.getSnapshots()) {
+                for (Snapshot snapshot : timeline.getSnapshots()) {
                     long offset = timeline.getOffset(snapshot.getSamplingTime());
-                    float lineX = PApplet.map(offset, timeline.getFirstOffset(), timeline.getLastOffset(), 0, graphBodyRect.getWidth()-1);
+                    float lineX = PApplet.map(offset, timeline.getFirstOffset(), timeline.getLastOffset(), 0, graphBodyRect.getWidth() - 1);
                     offscreenGraphBuffer.line(lineX, 0, lineX, graphBodyRect.getHeight());
                 }
             }
-            
-            if (queuedJobsGraph!=null) queuedJobsGraph.draw(offscreenGraphBuffer);
-            if (runningJobsGraph!=null) runningJobsGraph.draw(offscreenGraphBuffer);
+
+            if (queuedJobsGraph != null) queuedJobsGraph.draw(offscreenGraphBuffer);
+            if (runningJobsGraph != null) runningJobsGraph.draw(offscreenGraphBuffer);
 
         }
-        
+
         offscreenGraphBuffer.endDraw();
     }
-    
+
     private void flipBuffers() {
         PGraphics temp = onscreenBuffer;
         onscreenBuffer = offscreenBuffer;
@@ -1424,173 +1456,174 @@ public class SketchState implements Runnable {
     }
 
     public void drawGraphWindow(PGraphics buf) {
-        
-        if (queuedJobsGraph==null && runningJobsGraph==null) return;
-        
-        buf.beginDraw();        
-        
-        // Graph 
-        
-        float x = graphBodyRect.getPos().x+1;
-        float y = graphRect.getPos().y+3;
-        
+
+        if (queuedJobsGraph == null && runningJobsGraph == null) return;
+
+        buf.beginDraw();
+
+        // Graph
+
+        float x = graphBodyRect.getPos().x + 1;
+        float y = graphRect.getPos().y + 3;
+
         buf.textFont(graphFont);
         buf.textAlign(PApplet.LEFT, PApplet.CENTER);
-        
+
         Utils.stroke(buf, runningJobsGraph.getColor());
         Utils.fill(buf, runningJobsGraph.getColor());
         buf.rect(x, y, slotWidth, slotHeight);
-        
-        x += slotWidth+5;
-        
-        buf.text("Running Jobs", x, y+slotHeight/2);
+
+        x += slotWidth + 5;
+
+        buf.text("Running Jobs", x, y + slotHeight / 2);
 
         x += buf.textWidth("Running Jobs") + padding;
         Utils.stroke(buf, queuedJobsGraph.getColor());
         Utils.fill(buf, queuedJobsGraph.getColor());
         buf.rect(x, y, slotWidth, slotHeight);
-        
-        x += slotWidth+5;
-        buf.text("Queued Jobs", x, y+slotHeight/2);
-        
+
+        x += slotWidth + 5;
+        buf.text("Queued Jobs", x, y + slotHeight / 2);
+
         // Time labels
-        
+
         buf.textFont(graphFont);
         Utils.stroke(buf, colorScheme.titleFontColor);
         Utils.fill(buf, colorScheme.titleFontColor);
 
         Bounds b = graphBodyRect.getBounds();
-                
+
         List<Snapshot> snapshots = timeline.getSnapshots();
-        
+
         float minDistance = graphBodyRect.getWidth() * 0.05f;
         float lastX = Float.MIN_VALUE;
-        
+
         long first = timeline.getFirstOffset();
         long last = timeline.getLastOffset();
-        
+
         DateTime baseline = new DateTime(timeline.getBaselineDate().getTime());
         DateTime date = new DateTime(baseline);
         date = date.withMinuteOfHour(0).withMillis(0);
 
-        int i =0;
-        
+        int i = 0;
+
         while (true) {
             date = date.plusMinutes(15);
-            
+
             if (date.isBefore(baseline)) continue;
-            
+
             Interval interval = new Interval(baseline, date);
             Duration duration = new Duration(interval);
             long offset = duration.getMillis();
-            
-            if (offset<first) continue;
-            if (offset>last) break;
+
+            if (offset < first) continue;
+            if (offset > last) break;
 
             float lineX = PApplet.map(offset, first, last, graphBodyRect.getPos().x, b.maxX);
 
-            if (lineX-lastX<minDistance) {
+            if (lineX - lastX < minDistance) {
                 continue;
             }
             lastX = lineX;
-            
-            if (i==0) {
+
+            if (i == 0) {
                 buf.textAlign(PApplet.LEFT, PApplet.TOP);
             }
-            else if (i==snapshots.size()-1) {
+            else if (i == snapshots.size() - 1) {
                 buf.textAlign(PApplet.RIGHT, PApplet.TOP);
             }
             else {
                 buf.textAlign(PApplet.CENTER, PApplet.TOP);
             }
-            
-            buf.text(df.print(date), lineX, graphBodyRect.getBounds().maxY+timeLabelOffset);
-        
+
+            buf.text(df.print(date), lineX, graphBodyRect.getBounds().maxY + timeLabelOffset);
+
             i++;
         }
-        
-        Snapshot lastSnapshot = snapshots.get(snapshots.size()-1);
+
+        Snapshot lastSnapshot = snapshots.get(snapshots.size() - 1);
         String dateStr = dfDate.print(new DateTime(lastSnapshot.getSamplingTime()));
         buf.textAlign(PApplet.RIGHT, PApplet.TOP);
-        buf.text(dateStr, b.maxX, graphRect.getPos().y+1);
-        
+        buf.text(dateStr, b.maxX, graphRect.getPos().y + 1);
+
         buf.endDraw();
     }
-    
+
     public class NodeSprite extends Sprite {
 
-    	protected GridNode node;
+        protected GridNode node;
         protected SlotSprite[] slots;
         protected JobSprite[] jobs;
         protected Rectangle rect;
- 
+
         NodeSprite(PVector pos, GridNode node, int numSlots) {
             super(pos);
             this.node = node;
             this.name = node.getShortName();
-            this.tooltip = "Node "+name;
+            this.tooltip = "Node " + name;
             this.slots = new SlotSprite[numSlots];
             this.jobs = new JobSprite[numSlots];
-            for (int s = 0; s<numSlots; s++) {
+            for (int s = 0; s < numSlots; s++) {
                 slots[s] = new SlotSprite(null, this);
-                slots[s].name = name+"/"+s;
-                slots[s].tooltip = tooltip+", Slot #"+s;
+                slots[s].name = name + "/" + s;
+                slots[s].tooltip = tooltip + ", Slot #" + s;
             }
         }
 
         public void setPos(PVector pos) {
-        	super.setPos(pos);
-        	if (slots==null) return;
-    		int row = 0;
-            for (int s = 0; s<slots.length; s++) {
-            	float col = s % SLOTS_PER_ROW;
+            super.setPos(pos);
+            if (slots == null) return;
+            int row = 0;
+            for (int s = 0; s < slots.length; s++) {
+                float col = s % SLOTS_PER_ROW;
                 float sx = col * (slotWidth + slotSpacing) + slotSpacing;
-                float sy = (row+1)*slotSpacing + row*slotHeight;
-            	slots[s].setPos(new PVector(pos.x + sx, pos.y + nodeLabelHeight + sy));
-            	if (col+1==SLOTS_PER_ROW) {
-            		row++;
-            	}
+                float sy = (row + 1) * slotSpacing + row * slotHeight;
+                slots[s].setPos(new PVector(pos.x + sx, pos.y + nodeLabelHeight + sy));
+                if (col + 1 == SLOTS_PER_ROW) {
+                    row++;
+                }
             }
         }
 
         public void draw(PGraphics buf) {
-        	if (rect==null) return;
-        	
+            if (rect == null) return;
+
             buf.strokeWeight(1);
             Utils.fill(buf, colorScheme.nodeBackgroundColor, opacity);
             Utils.stroke(buf, colorScheme.nodeBorderColor, opacity);
-              
+
             buf.rect(pos.x, pos.y, rect.getWidth(), rect.getHeight());
-            
-            for (int s = 0; s<slots.length; s++) {
+
+            for (int s = 0; s < slots.length; s++) {
                 slots[s].draw(buf);
             }
 
             Utils.fill(buf, colorScheme.nodeFontColor, opacity);
-            
+
             buf.textFont(nodeFont);
             buf.textAlign(PApplet.CENTER, PApplet.CENTER);
-            float x = pos.x + rect.getWidth()/2;
-            float y = pos.y + nodeLabelHeight/2;
-            buf.text(name, (int)x, (int)y);
+            float x = pos.x + rect.getWidth() / 2;
+            float y = pos.y + nodeLabelHeight / 2;
+            buf.text(name, (int) x, (int) y);
         }
-        
-        public void draw() { }
 
-		public Rectangle getRect() {
-			return rect;
-		}
+        public void draw() {
+        }
 
-		public void setRect(Rectangle rect) {
-			setPos(rect.getPos());
-			this.rect = rect;
-		}
+        public Rectangle getRect() {
+            return rect;
+        }
+
+        public void setRect(Rectangle rect) {
+            setPos(rect.getPos());
+            this.rect = rect;
+        }
     }
 
     public class SlotSprite extends Sprite {
 
-    	protected NodeSprite nodeSprite;
-    	
+        protected NodeSprite nodeSprite;
+
         SlotSprite(PVector pos, NodeSprite nodeSprite) {
             super(pos);
             this.nodeSprite = nodeSprite;
@@ -1600,17 +1633,17 @@ public class SketchState implements Runnable {
             if (isHeatmap) {
                 Long usage = slotUsage.get(name);
                 int slotColor = buf.color(0, 100, 100);
-                if (usage==null) usage = 0L;
-                
+                if (usage == null) usage = 0L;
+
                 Long startOffset = slotStartOffsets.get(name);
-                if (startOffset!=null) {
+                if (startOffset != null) {
                     usage += totalElapsed - startOffset;
                 }
-                
+
                 long total = totalElapsed - nextStartingPosition;
-                float percentInUse = (float)usage/(float)total;
-                if (percentInUse<0 || percentInUse>1) {
-                    log.warn("Usage percent for slot {} is out of bounds: {}",name,percentInUse);
+                float percentInUse = (float) usage / (float) total;
+                if (percentInUse < 0 || percentInUse > 1) {
+                    log.warn("Usage percent for slot {} is out of bounds: {}", name, percentInUse);
                     percentInUse = PApplet.constrain(percentInUse, 0, 1);
                 }
 
@@ -1623,17 +1656,17 @@ public class SketchState implements Runnable {
             }
             else {
                 Utils.stroke(buf, colorScheme.emptySlotColor, opacity);
-                Utils.fill(buf, colorScheme.emptySlotColor, opacity);   
+                Utils.fill(buf, colorScheme.emptySlotColor, opacity);
             }
             buf.strokeWeight(1);
             buf.rect(pos.x, pos.y, slotWidth, slotHeight);
         }
-        
+
         public NodeSprite getNodeSprite() {
-        	return nodeSprite;
+            return nodeSprite;
         }
     }
-    
+
     public class JobSprite extends Sprite {
 
         protected String fullJobId;
@@ -1644,7 +1677,7 @@ public class SketchState implements Runnable {
         protected boolean defunct = false;
         protected PVector endPos; // used for laser tracking
         protected SlotSprite slotSprite;
-        
+
         JobSprite(PVector pos, String fullJobId, String username) {
             super(pos);
             this.fullJobId = fullJobId;
@@ -1652,22 +1685,22 @@ public class SketchState implements Runnable {
         }
 
         public void draw(PGraphics buf) {
-        	
-        	if (getTweens().isEmpty() && slotSprite!=null && slotSprite.getPos().x>0 && slotSprite.getPos().y>0) {
-        		// Update the job's position to the slotSprite it is supposed to sit on. This is necessary when 
-        		// job sprites are created before the slot sprites, and thus have no location initially.
-        		setPos(slotSprite.getPos());
-        	}
-        	
+
+            if (getTweens().isEmpty() && slotSprite != null && slotSprite.getPos().x > 0 && slotSprite.getPos().y > 0) {
+                // Update the job's position to the slotSprite it is supposed to sit on. This is necessary when
+                // job sprites are created before the slot sprites, and thus have no location initially.
+                setPos(slotSprite.getPos());
+            }
+
             buf.strokeWeight(1);
 
-            if (endPos!=null && isDrawLaserTracking) {
+            if (endPos != null && isDrawLaserTracking) {
                 Utils.stroke(buf, laserColor);
-                float ox = slotWidth/2;
-                float oy = slotHeight/2;
-                buf.line(pos.x+ox, pos.y+oy, endPos.x+ox, endPos.y+oy);
+                float ox = slotWidth / 2;
+                float oy = slotHeight / 2;
+                buf.line(pos.x + ox, pos.y + oy, endPos.x + ox, endPos.y + oy);
             }
-            
+
             if (bwMode && !username.equals(legend.getHighlightUsername())) {
                 buf.colorMode(PApplet.HSB, 360, 100, 100);
                 int bwColor = buf.color(buf.hue(color), 0, 50);
@@ -1679,14 +1712,14 @@ public class SketchState implements Runnable {
                 buf.stroke(borderColor, opacity);
                 buf.fill(color, opacity);
             }
-            
+
             if (queued) {
-            	if (summaryMode) {
-            		buf.rect(pos.x, pos.y, summaryQueuedJobWidth, summaryQueuedJobWidth);
-            	}
-            	else {
-            		buf.rect(pos.x, pos.y, queuedJobWidth, queuedJobWidth);
-            	}
+                if (summaryMode) {
+                    buf.rect(pos.x, pos.y, summaryQueuedJobWidth, summaryQueuedJobWidth);
+                }
+                else {
+                    buf.rect(pos.x, pos.y, queuedJobWidth, queuedJobWidth);
+                }
             }
             else {
                 buf.rect(pos.x, pos.y, slotWidth, slotHeight);
@@ -1704,13 +1737,13 @@ public class SketchState implements Runnable {
 
         public void jobQueued() {
         }
-        
+
         public void jobStarted() {
             this.endPos = null;
         }
-        
+
         public void jobEnded() {
-        	slotSprite = null;
+            slotSprite = null;
             defunct = true;
             opacity = 0; // just in case
         }
@@ -1718,111 +1751,111 @@ public class SketchState implements Runnable {
         public String getUsername() {
             return username;
         }
-        
+
         public SlotSprite getSlotSprite() {
-        	return slotSprite;
+            return slotSprite;
         }
     }
-    
+
     public class GridNodeArray implements Drawable {
-    	
-    	private Set<NodeSprite> sprites = new HashSet<NodeSprite>();
-    	private List<List<NodeSprite>> grid = new ArrayList<List<NodeSprite>>();
-    	
-    	public void setNode(int x, int y, NodeSprite nodeSprite) {
-    		ArrayUtils.ensureSize((ArrayList<?>)grid, y+1);
-    		List<NodeSprite> row = grid.get(y);
-    		if (row==null) {
-    			row = new ArrayList<NodeSprite>();
-    			grid.set(y, row);
-    		}
-    		ArrayUtils.ensureSize((ArrayList<?>)row, x+1);
-    		row.set(x, nodeSprite);
-    		sprites.add(nodeSprite);
-    	}
-    	
-    	public NodeSprite getNode(int x, int y) {
-    		List<NodeSprite> row = grid.get(y);
-    		if (row==null) return null;
-    		return row.get(x);
-    	}
 
-    	public int getNumEmptyRows() {
-	        int emptyRows = 0;
-	    	for(List<NodeSprite> row : grid) {
-	    		if (row!=null && !row.isEmpty()) break;
-	    		emptyRows++;
-	    	}
-	    	return emptyRows;
-    	}
+        private Set<NodeSprite> sprites = new HashSet<NodeSprite>();
+        private List<List<NodeSprite>> grid = new ArrayList<List<NodeSprite>>();
 
-    	public int getNumEmptyCols() {
-	        int emptyCols = Integer.MAX_VALUE;
-	    	for(List<NodeSprite> row : grid) {
-	    		if (row==null || row.isEmpty()) continue;
-	    		int emptyRowCols = 0;
-		    	for(NodeSprite nodeSprite : row) {
-		    		if (nodeSprite!=null) break;
-		    		emptyRowCols++;
-				}
-		    	emptyCols = Math.min(emptyCols, emptyRowCols);
-	    	}
-	    	return emptyCols;
-    	}
-    	
-    	public int getNumRows() {
-    		return grid.size();
-    	}
-    	
-    	public int getNumCols() {
-    		int max = 0;
-    		for(List<NodeSprite> row : grid) {
-    			if (row==null) continue;
-    			if (row.size() > max) {
-    				max = row.size();
-    			}
-    		}
-    		return max;
-    	}
-    	
-    	public List<List<NodeSprite>> getRows() {
-    		return grid;
-    	}
-    	
-    	public List<NodeSprite> getRow(int row) {
-    		return grid.get(row);
-    	}
+        public void setNode(int x, int y, NodeSprite nodeSprite) {
+            ArrayUtils.ensureSize((ArrayList<?>) grid, y + 1);
+            List<NodeSprite> row = grid.get(y);
+            if (row == null) {
+                row = new ArrayList<NodeSprite>();
+                grid.set(y, row);
+            }
+            ArrayUtils.ensureSize((ArrayList<?>) row, x + 1);
+            row.set(x, nodeSprite);
+            sprites.add(nodeSprite);
+        }
+
+        public NodeSprite getNode(int x, int y) {
+            List<NodeSprite> row = grid.get(y);
+            if (row == null) return null;
+            return row.get(x);
+        }
+
+        public int getNumEmptyRows() {
+            int emptyRows = 0;
+            for (List<NodeSprite> row : grid) {
+                if (row != null && !row.isEmpty()) break;
+                emptyRows++;
+            }
+            return emptyRows;
+        }
+
+        public int getNumEmptyCols() {
+            int emptyCols = Integer.MAX_VALUE;
+            for (List<NodeSprite> row : grid) {
+                if (row == null || row.isEmpty()) continue;
+                int emptyRowCols = 0;
+                for (NodeSprite nodeSprite : row) {
+                    if (nodeSprite != null) break;
+                    emptyRowCols++;
+                }
+                emptyCols = Math.min(emptyCols, emptyRowCols);
+            }
+            return emptyCols;
+        }
+
+        public int getNumRows() {
+            return grid.size();
+        }
+
+        public int getNumCols() {
+            int max = 0;
+            for (List<NodeSprite> row : grid) {
+                if (row == null) continue;
+                if (row.size() > max) {
+                    max = row.size();
+                }
+            }
+            return max;
+        }
+
+        public List<List<NodeSprite>> getRows() {
+            return grid;
+        }
+
+        public List<NodeSprite> getRow(int row) {
+            return grid.get(row);
+        }
 
         public void draw(PGraphics buf) {
 
-        	for(List<NodeSprite> row : grid) {
-        		if (row==null) continue;
-        		for(NodeSprite nodeSprite : row) {
-                    if (nodeSprite!=null) nodeSprite.draw(buf);
-        		}
-        	}
-        	
+            for (List<NodeSprite> row : grid) {
+                if (row == null) continue;
+                for (NodeSprite nodeSprite : row) {
+                    if (nodeSprite != null) nodeSprite.draw(buf);
+                }
+            }
+
             if (!isHeatmap) {
                 // Draw jobs
                 Iterator<JobSprite> i = getJobSprites().values().iterator();
                 while (i.hasNext()) {
-                	JobSprite sprite = i.next();
+                    JobSprite sprite = i.next();
                     if (sprite.isStatic()) {
-                    	if (sprite.slotSprite!=null) {
-                    		if (sprite.slotSprite.nodeSprite!=null) {
-                    			if (nodeSpriteInSubset(sprite.slotSprite.nodeSprite)) {
-            	                    sprite.draw(buf);
-                    			}
-                    		}
-                    	}
-	                    sprite.update();
+                        if (sprite.slotSprite != null) {
+                            if (sprite.slotSprite.nodeSprite != null) {
+                                if (nodeSpriteInSubset(sprite.slotSprite.nodeSprite)) {
+                                    sprite.draw(buf);
+                                }
+                            }
+                        }
+                        sprite.update();
                     }
                 }
             }
         }
-    	
+
         public boolean nodeSpriteInSubset(NodeSprite nodeSprite) {
-        	return sprites.contains(nodeSprite);
+            return sprites.contains(nodeSprite);
         }
     }
 
@@ -1833,35 +1866,35 @@ public class SketchState implements Runnable {
     public PImage getGraphBuffer() {
         return onscreenGraphBuffer;
     }
-    
+
     public Rectangle getGraphRect() {
         return graphBodyRect;
     }
 
-    public Map<String,Integer> getSlotsUsedByUser() {
+    public Map<String, Integer> getSlotsUsedByUser() {
         return ImmutableMap.copyOf(state.getSlotsUsedByUser());
     }
-    
+
     public Integer getColorForUser(String username) {
         return legend.getColorAssignments().get(username);
     }
-    
+
     public List<String> getUsers() {
         return ImmutableList.copyOf(legend.getColorAssignments().keySet());
     }
 
     public void setColorScheme(ColorScheme colorScheme) {
         this.colorScheme = colorScheme;
-        this.runningJobsGraph.setColor(colorScheme.graphLineColorRunningJobs); 
+        this.runningJobsGraph.setColor(colorScheme.graphLineColorRunningJobs);
         this.queuedJobsGraph.setColor(colorScheme.graphLineColorQueuedJobs);
     }
-    
+
     public ColorScheme getColorScheme() {
         return colorScheme;
     }
 
     public void setBwMode(boolean bwMode, String username) {
-        if (bwMode!=this.bwMode || (bwMode && !legend.getHighlightUsername().equals(username))) {
+        if (bwMode != this.bwMode || (bwMode && !legend.getHighlightUsername().equals(username))) {
             setColorScheme(bwMode ? new GrayColorScheme() : new DefaultColorScheme());
             this.bwMode = bwMode;
             legend.setHighlightUsername(username);
@@ -1871,12 +1904,12 @@ public class SketchState implements Runnable {
     public void setSummaryMode(boolean summaryMode) {
         this.summaryMode = summaryMode;
     }
-    
+
     public void setShowGraph(boolean showGraph) {
         this.showGraph = showGraph;
         resizeGraphWindow();
     }
-    
+
     public Multimap<String, JobSprite> getJobSprites() {
         synchronized (jobSpriteMap) {
             return ImmutableMultimap.copyOf(jobSpriteMap);
@@ -1894,38 +1927,38 @@ public class SketchState implements Runnable {
     public void setDrawSnapshotLines(boolean isDrawSnapshotLines) {
         this.isDrawSnapshotLines = isDrawSnapshotLines;
     }
-    
+
     public void setAnonUsernames(boolean isAnonUsernames) {
         legend.setAnonUsernames(isAnonUsernames);
     }
-    
+
     public boolean isHeatmap() {
         return isHeatmap;
     }
 
     public void setHeatmap(boolean isHeatmap) {
-        if (isHeatmap!=this.isHeatmap) {
+        if (isHeatmap != this.isHeatmap) {
             setColorScheme(isHeatmap ? new HeatmapColorScheme() : new DefaultColorScheme());
             this.isHeatmap = isHeatmap;
         }
     }
-    
+
     public void setTimeline(Timeline timeline) {
         this.timeline = timeline;
     }
-    
+
     public Collection<String> getSubsetNames() {
-    	return gridSubsets.keySet();
+        return gridSubsets.keySet();
     }
-    
+
     public void setCurrentSubsetName(String subsetName) {
-    	if (currSubsetName!=null && currSubsetName.equals(subsetName)) return;
-    	log.info("Changing current subset to {}",subsetName);
-     	this.currSubsetName = subsetName;
-    	resizeForSubset();
+        if (currSubsetName != null && currSubsetName.equals(subsetName)) return;
+        log.info("Changing current subset to {}", subsetName);
+        this.currSubsetName = subsetName;
+        resizeForSubset();
     }
-    
+
     public GridNodeArray getCurrentSubset() {
-    	return gridSubsets.get(currSubsetName);
+        return gridSubsets.get(currSubsetName);
     }
 }

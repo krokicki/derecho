@@ -22,49 +22,49 @@ public abstract class Sprite implements Drawable {
     protected int countdown = 0;
     protected String name;
     protected String tooltip;
-    protected PVector pos = new PVector(0,0);
+    protected PVector pos = new PVector(0, 0);
     protected float opacity = 255;
     private Set<Motion> tweens = new HashSet<Motion>();
 
     public Sprite(PVector pos) {
-    	setPos(pos);
+        setPos(pos);
     }
 
     public void update() {
-        if (countdown>0) countdown--;
+        if (countdown > 0) countdown--;
         if (isInMotion()) {
             Set<Motion> toRemove = new HashSet<Motion>();
             synchronized (tweens) {
-	            for(Motion m : tweens) {
-	                if (!m.isPlaying()) {
-	                    if (m.getPosition()==0) {
-	                        m.play();
-	                    }
-	                    else {
-	                        toRemove.add(m);    
-	                    }
-	                }
-	                else {
-	                    m.update();
-	                }
-	            }
-	            for (Motion m : toRemove) {
-	                tweens.remove(m);
-	                if (!isInMotion()) {
-	                    // This sprite just stopped, start the Schrodinger countdown during which it appears both static and in motion
-	                    countdown=30;
-	                }
-	            }       
+                for (Motion m : tweens) {
+                    if (!m.isPlaying()) {
+                        if (m.getPosition() == 0) {
+                            m.play();
+                        }
+                        else {
+                            toRemove.add(m);
+                        }
+                    }
+                    else {
+                        m.update();
+                    }
+                }
+                for (Motion m : toRemove) {
+                    tweens.remove(m);
+                    if (!isInMotion()) {
+                        // This sprite just stopped, start the Schrodinger countdown during which it appears both static and in motion
+                        countdown = 30;
+                    }
+                }
             }
         }
     }
-    
+
     public boolean isStatic() {
-        return countdown>0 || tweens.isEmpty();
+        return countdown > 0 || tweens.isEmpty();
     }
-    
+
     public boolean isInMotion() {
-        return countdown>0 || !tweens.isEmpty();
+        return countdown > 0 || !tweens.isEmpty();
     }
 
     public int getCountdown() {
@@ -96,9 +96,9 @@ public abstract class Sprite implements Drawable {
     }
 
     public void setPos(PVector pos) {
-    	if (pos!=null) {
-    		this.pos.set(pos.x, pos.y, 0);
-    	}
+        if (pos != null) {
+            this.pos.set(pos.x, pos.y, 0);
+        }
     }
 
     public float getOpacity() {
@@ -110,14 +110,14 @@ public abstract class Sprite implements Drawable {
     }
 
     public Set<Motion> getTweens() {
-    	synchronized (tweens) {
-    		return  ImmutableSet.copyOf(tweens);
-    	}
+        synchronized (tweens) {
+            return ImmutableSet.copyOf(tweens);
+        }
     }
-    
+
     public void addTween(Motion tween) {
-    	synchronized (tweens) {
-    		tweens.add(tween);
-    	}
+        synchronized (tweens) {
+            tweens.add(tween);
+        }
     }
 }

@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public class GridNode {
 
     private static final Logger log = LoggerFactory.getLogger(GridNode.class);
-    
+
     private final String shortName;
     private final GridJob[] slots;
 
@@ -24,24 +24,24 @@ public class GridNode {
         this.shortName = shortName;
         this.slots = new GridJob[numSlots];
     }
-    
+
     public String getShortName() {
         return shortName;
     }
-    
+
     public List<Integer> assignJobToSlots(GridJob job) {
         List<Integer> indexes = new ArrayList<Integer>();
         int slotsLeft = job.getSlots();
-        
+
         if (job.isExclusive()) {
-        	// Exclusive jobs attempt to take the entire node
-        	log.trace("Exclusive job needs {} slots, not {}",slots.length,slotsLeft);
-        	slotsLeft = slots.length;
+            // Exclusive jobs attempt to take the entire node
+            log.trace("Exclusive job needs {} slots, not {}", slots.length, slotsLeft);
+            slotsLeft = slots.length;
         }
-        
+
         Set<String> running = new HashSet<String>();
-        for(int s=0; s<slots.length && slotsLeft>0; s++) {
-            if (slots[s]==null) {
+        for (int s = 0; s < slots.length && slotsLeft > 0; s++) {
+            if (slots[s] == null) {
                 slots[s] = job;
                 indexes.add(s);
                 slotsLeft--;
@@ -49,56 +49,57 @@ public class GridNode {
                 job.setNode(this);
             }
             else if (slots[s].getFullJobId().equals(job.getFullJobId())) {
-                log.warn("Node "+shortName+" is already running "+job.getFullJobId()+" on slot "+s);
+                log.warn("Node " + shortName + " is already running " + job.getFullJobId() + " on slot " + s);
                 slotsLeft--;
                 job.setNode(this);
             }
             else {
                 running.add(slots[s].getFullJobId());
             }
-        }   
-        if (slotsLeft>0) {
-            log.debug("Node state: {}",this);
-            log.error("Node "+shortName+" cannot allocate "+slotsLeft+" slots for "+job.getFullJobId()+" because other jobs are running: "+running);
+        }
+        if (slotsLeft > 0) {
+            log.debug("Node state: {}", this);
+            log.error("Node " + shortName + " cannot allocate " + slotsLeft + " slots for " + job.getFullJobId() + " because other jobs are running: "
+                    + running);
         }
         return indexes;
     }
 
     public void removeJob(GridJob stateJob) {
-        for(int i=0; i<slots.length; i++) {
-            if (slots[i]!=null && slots[i].getFullJobId().equals(stateJob.getFullJobId())) {
-                log.trace("erasing "+slots[i].getFullJobId()+" from node "+getShortName());
+        for (int i = 0; i < slots.length; i++) {
+            if (slots[i] != null && slots[i].getFullJobId().equals(stateJob.getFullJobId())) {
+                log.trace("erasing " + slots[i].getFullJobId() + " from node " + getShortName());
                 slots[i] = null;
             }
         }
     }
-    
+
     public GridJob[] getSlots() {
         return slots;
     }
-    
+
     public int getNumJobs() {
         int c = 0;
-        for(GridJob job : slots) {
-            if (job!=null) c++;
+        for (GridJob job : slots) {
+            if (job != null) c++;
         }
         return c;
     }
-    
+
     @Override
     public String toString() {
         StringBuilder slotStr = new StringBuilder();
-        for(int i=0; i<slots.length; i++) {
-            if (i>0) {
+        for (int i = 0; i < slots.length; i++) {
+            if (i > 0) {
                 slotStr.append(" ");
             }
-            if (slots[i]==null) {
+            if (slots[i] == null) {
                 slotStr.append("empty");
             }
             else {
                 slotStr.append(slots[i].getFullJobId());
             }
         }
-        return "GridNode [name=" + shortName+", ("+slotStr+")]";
+        return "GridNode [name=" + shortName + ", (" + slotStr + ")]";
     }
 }

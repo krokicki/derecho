@@ -17,12 +17,12 @@ import com.google.common.collect.ImmutableSet;
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
 public class SummaryView implements Drawable {
-    
+
     private Legend legend;
-    private Map<String,Integer> slotsUsedByUser;
-    private Map<String,Integer> slotsQueuedByUser;
-    private Map<String,UserSummaryView> summaryViewMap = new LinkedHashMap<String,UserSummaryView>();
-    
+    private Map<String, Integer> slotsUsedByUser;
+    private Map<String, Integer> slotsQueuedByUser;
+    private Map<String, UserSummaryView> summaryViewMap = new LinkedHashMap<String, UserSummaryView>();
+
     private Rectangle rect;
     private int fontHeight;
     private PFont font;
@@ -38,21 +38,21 @@ public class SummaryView implements Drawable {
         this.font = font;
         this.legend = legend;
         this.fontHeight = fontHeight;
-        this.ySpacing = fontHeight*1/2;
-        this.lineSpacing = fontHeight*1/3;
+        this.ySpacing = fontHeight * 1 / 2;
+        this.lineSpacing = fontHeight * 1 / 3;
     }
-    
+
     public void draw(PGraphics buf) {
-        
-    	if (rect==null) return;
-        if (slotsUsedByUser==null || slotsQueuedByUser==null) return;
-        
-        for(String username : legend.getColorAssignments().keySet()) {
-            
+
+        if (rect == null) return;
+        if (slotsUsedByUser == null || slotsQueuedByUser == null) return;
+
+        for (String username : legend.getColorAssignments().keySet()) {
+
             Integer running = slotsUsedByUser.get(username);
             Integer queued = slotsQueuedByUser.get(username);
-            if (running==null) running = 0;
-            if (queued==null) queued = 0;
+            if (running == null) running = 0;
+            if (queued == null) queued = 0;
             UserSummaryView userSummaryView = new UserSummaryView(username, running, queued);
             summaryViewMap.put(username, userSummaryView);
         }
@@ -64,84 +64,84 @@ public class SummaryView implements Drawable {
         buf.endDraw();
     }
 
-    public void retain(Map<String,Integer> slotsUsedByUser, Map<String,Integer> slotsQueuedByUser) {
+    public void retain(Map<String, Integer> slotsUsedByUser, Map<String, Integer> slotsQueuedByUser) {
         this.slotsUsedByUser = slotsUsedByUser;
         this.slotsQueuedByUser = slotsQueuedByUser;
         Set<String> users = ImmutableSet.copyOf(summaryViewMap.keySet());
-        for(String username : users) {
+        for (String username : users) {
             Integer slots = slotsUsedByUser.get(username);
-            if (slots==null) {
+            if (slots == null) {
                 summaryViewMap.remove(username);
             }
         }
     }
-    
+
     public Rectangle getUserRect(String username) {
         UserSummaryView userSummaryView = summaryViewMap.get(username);
-        if (userSummaryView!=null) {
+        if (userSummaryView != null) {
             return userSummaryView.getPositionedRect();
         }
         return null;
     }
-    
+
     public void setRect(Rectangle rect) {
-    	this.rect = rect;
+        this.rect = rect;
     }
-    
+
     public class UserSummaryView implements SizedDrawable {
 
         private Rectangle rect;
         private String userName;
         private String userLabel;
         private List<String> lines = new ArrayList<String>();
-        
+
         public UserSummaryView(String name, int running, int queued) {
             this.userName = name;
-            this.userLabel = legend.isAnonUsernames()?legend.getAnonNames().get(name):name;
+            this.userLabel = legend.isAnonUsernames() ? legend.getAnonNames().get(name) : name;
             lines.add("");
             lines.add(userLabel);
-            lines.add(running+" running");
-            lines.add(queued+" queued");
+            lines.add(running + " running");
+            lines.add(queued + " queued");
         }
 
         public Rectangle getSize(PGraphics buf) {
-            if (rect==null) {
+            if (rect == null) {
                 calculateSize(buf);
             }
             return rect;
         }
-        
+
         public Rectangle getPositionedRect() {
-        	if (rect==null) return null;
-            if (rect.getPos().x==0 && rect.getPos().y==0) return null; // Not yet positioned
+            if (rect == null) return null;
+            if (rect.getPos().x == 0 && rect.getPos().y == 0) return null; // Not yet positioned
             return rect;
         }
-        
+
         private Rectangle calculateSize(PGraphics buf) {
-            
+
             float w = 0;
             float h = 0;
-            
-            for(String line : lines) {
+
+            for (String line : lines) {
                 float lineWidth = buf.textWidth(line);
                 if (lineWidth > w) w = lineWidth;
                 h += fontHeight + lineSpacing;
             }
-            
+
             h -= lineSpacing;
-            
-            rect = new Rectangle(0, 0, w+boxPadding*2, h+boxPadding*2);
+
+            rect = new Rectangle(0, 0, w + boxPadding * 2, h + boxPadding * 2);
             return rect;
         }
-        
+
         public void setPos(PVector pos) {
             rect.setPos(pos.x, pos.y);
         }
-        
+
         public void draw(PGraphics buf) {
 
             buf.beginDraw();
-            
+
             buf.textFont(font);
             buf.textAlign(PApplet.TOP, PApplet.TOP);
 
@@ -150,7 +150,7 @@ public class SummaryView implements Drawable {
 
             int color = legend.getItemColor(userName);
             String highlightUsername = legend.getHighlightUsername();
-            if (highlightUsername!=null && !userName.equals(highlightUsername)) {
+            if (highlightUsername != null && !userName.equals(highlightUsername)) {
                 buf.colorMode(PApplet.HSB, 360, 100, 100);
                 buf.fill(buf.color(buf.hue(color), 0, 50));
                 buf.colorMode(PApplet.RGB);
@@ -158,21 +158,21 @@ public class SummaryView implements Drawable {
             else {
                 buf.fill(color);
             }
-            
-            for(String line : lines) {
+
+            for (String line : lines) {
                 float lineWidth = buf.textWidth(line);
                 ix = rect.getBounds().minX;
-                ix += (rect.getWidth()-lineWidth)/2;
+                ix += (rect.getWidth() - lineWidth) / 2;
                 buf.text(line, ix, iy);
                 iy += fontHeight + lineSpacing;
             }
 
             // Draw outline
-//            buf.noFill();
-//            buf.strokeWeight(1);
-//            Utils.stroke(buf, buf.color(255));
-//            rect.draw(buf);
-            
+            // buf.noFill();
+            // buf.strokeWeight(1);
+            // Utils.stroke(buf, buf.color(255));
+            // rect.draw(buf);
+
             buf.endDraw();
         }
     }

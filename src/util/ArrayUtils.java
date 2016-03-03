@@ -8,11 +8,11 @@ import java.util.ArrayList;
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
 public class ArrayUtils {
-	
+
 	public static void ensureSize(ArrayList<?> list, int size) {
-	    list.ensureCapacity(size);
-	    while (list.size() < size) {
-	        list.add(null);
-	    }
+		list.ensureCapacity(size);
+		while (list.size() < size) {
+			list.add(null);
+		}
 	}
 }

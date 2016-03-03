@@ -2,29 +2,29 @@
 
 <configuration>
 
-  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <!-- encoders are assigned the type
-         ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
-    <encoder>
-      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg%n</pattern>
-    </encoder>
-  </appender>
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<!-- encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder 
+			by default -->
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg%n</pattern>
+		</encoder>
+	</appender>
 
-  <logger name="org.perf4j.TimingLogger" level="ERROR"/>
-  
-  <logger name="snapshot" level="INFO"/>
-  
-  <logger name="timeline" level="INFO"/>
-  <logger name="timeline.Timeline" level="INFO"/>
-  <logger name="timeline.GridState" level="INFO"/>
-  
-  <logger name="gui" level="INFO"/>
-  <logger name="gui.SketchState" level="INFO"/>
-  
-  <!-- Strictly speaking, the level attribute is not necessary since -->
-  <!-- the level of the root level is set to DEBUG by default.       -->
-  <root level="DEBUG">          
-    <appender-ref ref="STDOUT" />
-  </root>  
-  
+	<logger name="org.perf4j.TimingLogger" level="ERROR" />
+
+	<logger name="snapshot" level="INFO" />
+
+	<logger name="timeline" level="INFO" />
+	<logger name="timeline.Timeline" level="INFO" />
+	<logger name="timeline.GridState" level="INFO" />
+
+	<logger name="gui" level="INFO" />
+	<logger name="gui.SketchState" level="INFO" />
+
+	<!-- Strictly speaking, the level attribute is not necessary since -->
+	<!-- the level of the root level is set to DEBUG by default. -->
+	<root level="DEBUG">
+		<appender-ref ref="STDOUT" />
+	</root>
+
 </configuration>

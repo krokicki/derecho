@@ -9,10 +9,10 @@ import processing.core.PVector;
  * @author <a href="mailto:krokicki@gmail.com">Konrad Rokicki</a>
  */
 public interface SizedDrawable extends Drawable {
-    
+
     public void draw(PGraphics buf);
-    
+
     public Rectangle getSize(PGraphics buf);
-    
+
     public void setPos(PVector pos);
 }

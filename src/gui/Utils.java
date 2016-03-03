@@ -13,13 +13,13 @@ import processing.core.PGraphics;
 public class Utils {
 
     public static int color(String hex) {
-        return PApplet.unhex("FF"+hex);
+        return PApplet.unhex("FF" + hex);
     }
-    
+
     public static void stroke(PGraphics buf, int color) {
         stroke(buf, color, 255);
     }
-    
+
     public static void stroke(PGraphics buf, int color, float opacity) {
         buf.colorMode(PApplet.RGB);
         buf.stroke(color, opacity);
@@ -28,10 +28,10 @@ public class Utils {
     public static void fill(PGraphics buf, int color) {
         fill(buf, color, 255);
     }
-    
+
     public static void fill(PGraphics buf, int color, float opacity) {
         buf.colorMode(PApplet.RGB);
-        buf.fill(color, opacity);   
+        buf.fill(color, opacity);
     }
 
     public static float calculateAverage(Collection<Float> values) {

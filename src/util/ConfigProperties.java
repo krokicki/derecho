@@ -16,13 +16,13 @@ import org.slf4j.LoggerFactory;
 public class ConfigProperties extends Properties {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigProperties.class);
-    
+
     private static final String DEFAULT_CONFIG_FILENAME = "derecho.properties";
-    
+
     private static ConfigProperties singleton;
 
     public static ConfigProperties getInstance() {
-        if (singleton==null) {
+        if (singleton == null) {
             String propertiesFileName = System.getProperty("APP_CONFIG");
             if (propertiesFileName == null) propertiesFileName = DEFAULT_CONFIG_FILENAME;
             singleton = new ConfigProperties();
@@ -30,15 +30,15 @@ public class ConfigProperties extends Properties {
         }
         return singleton;
     }
-    
+
     private void load(String propertiesFileName) {
         try {
             InputStream is = ConfigProperties.class.getClassLoader().getResourceAsStream(propertiesFileName);
-            if (is==null) {
+            if (is == null) {
                 is = new FileInputStream(propertiesFileName);
             }
             load(is);
-            log.info("Loaded properties from "+propertiesFileName);
+            log.info("Loaded properties from " + propertiesFileName);
         }
         catch (Exception e) {
             log.error("Could not load properties file: " + propertiesFileName);
@@ -49,44 +49,44 @@ public class ConfigProperties extends Properties {
     public static String getString(String name) {
         return getString(name, null);
     }
-    
+
     public static String getString(String name, String defaultValue) {
         String s = getInstance().getProperty(name);
-        if (s==null) return defaultValue;
+        if (s == null) return defaultValue;
         return s;
     }
-    
+
     public static Boolean getBoolean(String name) {
         return getBoolean(name, null);
     }
-    
+
     public static Boolean getBoolean(String name, Boolean defaultValue) {
         String s = getInstance().getProperty(name);
-        if (s==null) return defaultValue;
+        if (s == null) return defaultValue;
         return Boolean.valueOf(s);
     }
-    
+
     public static Integer getInteger(String name) {
         return getInteger(name, null);
     }
-    
+
     public static Long getLong(String name) {
         return getLong(name, null);
     }
-    
+
     public static Integer getInteger(String name, Integer defaultValue) {
         String s = getInstance().getProperty(name);
         if (isEmpty(s)) return defaultValue;
         return Integer.valueOf(s);
     }
-    
+
     public static Long getLong(String name, Long defaultValue) {
         String s = getInstance().getProperty(name);
         if (isEmpty(s)) return defaultValue;
         return Long.valueOf(s);
     }
-    
+
     private static boolean isEmpty(String s) {
-    	return s==null || s.trim().equals("");
+        return s == null || s.trim().equals("");
     }
 }

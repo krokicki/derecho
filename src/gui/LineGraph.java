@@ -26,75 +26,75 @@ import timeline.Timeline;
 public class LineGraph implements Drawable {
 
     private static final Logger log = LoggerFactory.getLogger(SketchState.class);
-    
+
     private final Timeline timeline;
     private final Map<Long, Integer> graphMap;
     private Rectangle rect;
     private int maxValue;
     private int color = Utils.color("FF0000");
-    
+
     public LineGraph(Rectangle rect, Timeline timeline, Map<Long, Integer> graphMap) {
         this.rect = rect;
         this.timeline = timeline;
         this.graphMap = graphMap;
     }
-    
+
     public void draw(PGraphics buf) {
 
         PVector pos = rect.getPos();
         Bounds b = rect.getBounds();
-        
-        Map<Long,Integer> map = new ConcurrentSkipListMap<Long,Integer>(graphMap);
+
+        Map<Long, Integer> map = new ConcurrentSkipListMap<Long, Integer>(graphMap);
         long firstOffset = timeline.getFirstOffset();
         long length = timeline.getLength();
-        long realLength = map.isEmpty()?0:(Collections.max(map.keySet()) - firstOffset);
-        
+        long realLength = map.isEmpty() ? 0 : (Collections.max(map.keySet()) - firstOffset);
+
         int minValue = 0;
 
-        if (realLength>length) {
-            log.warn("realLength>length : {}>{}",realLength,length);
+        if (realLength > length) {
+            log.warn("realLength>length : {}>{}", realLength, length);
             length = realLength;
         }
-        
+
         buf.strokeWeight(2);
-        
+
         Utils.stroke(buf, color);
         Utils.fill(buf, color);
-        
+
         buf.strokeCap(PApplet.SQUARE);
 
         Float prevX = null;
         Float prevY = null;
         Float firstX = null;
         Float firstY = null;
-        
+
         Integer currx = null;
         Collection<Float> values = new HashSet<Float>();
-        
-        for(Long offset : map.keySet()) {
+
+        for (Long offset : map.keySet()) {
             Integer value = map.get(offset);
-                
-            if (offset > firstOffset+length) {
-                log.warn("offset>end : {}>{}",offset,firstOffset+length);
+
+            if (offset > firstOffset + length) {
+                log.warn("offset>end : {}>{}", offset, firstOffset + length);
             }
-            
-            float x = PApplet.map(offset, firstOffset, firstOffset+length, pos.x, b.maxX-1);
+
+            float x = PApplet.map(offset, firstOffset, firstOffset + length, pos.x, b.maxX - 1);
             float y = PApplet.map(value, minValue, maxValue, b.maxY, pos.y);
-            if (firstX==null) firstX = x;
-            if (firstY==null) firstY = y;
-            
+            if (firstX == null) firstX = x;
+            if (firstY == null) firstY = y;
+
             int intx = Math.round(x);
-            
-            if (currx!=null && currx != intx && !values.isEmpty()) {
-                
+
+            if (currx != null && currx != intx && !values.isEmpty()) {
+
                 // Get the average of the values we've seen for this time point
                 float avgy = Utils.calculateAverage(values);
-                
+
                 values.clear();
 
-                if (prevX==null) prevX = pos.x;
-                if (prevY==null) prevY = y;
-                
+                if (prevX == null) prevX = pos.x;
+                if (prevY == null) prevY = y;
+
                 buf.line(prevX, prevY, x, prevY);
                 buf.strokeCap(PApplet.ROUND);
                 buf.line(x, prevY, x, avgy);
@@ -102,17 +102,17 @@ public class LineGraph implements Drawable {
                 prevX = x;
                 prevY = avgy;
             }
-            
+
             currx = intx;
-            values.add(y);  
+            values.add(y);
         }
 
-        if (prevX!=null && prevY!=null) {
-	        buf.strokeCap(PApplet.SQUARE);
-	        buf.line(prevX, prevY, b.maxX-1, prevY);
+        if (prevX != null && prevY != null) {
+            buf.strokeCap(PApplet.SQUARE);
+            buf.line(prevX, prevY, b.maxX - 1, prevY);
         }
     }
-    
+
     public int getColor() {
         return color;
     }
@@ -128,8 +128,8 @@ public class LineGraph implements Drawable {
     public Map<Long, Integer> getGraphMap() {
         return graphMap;
     }
-    
+
     public void setRect(Rectangle rect) {
-    	this.rect = rect;
+        this.rect = rect;
     }
 }

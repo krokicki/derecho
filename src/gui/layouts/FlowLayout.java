@@ -22,7 +22,7 @@ public class FlowLayout {
     private float ySpacing;
     private float padding;
     private boolean alignToMiddle;
-    
+
     public FlowLayout(PGraphics buf, float xSpacing, float ySpacing, float padding, boolean alignToMiddle) {
         this.buf = buf;
         this.xSpacing = xSpacing;
@@ -30,71 +30,72 @@ public class FlowLayout {
         this.padding = padding;
         this.alignToMiddle = alignToMiddle;
     }
-    
+
     public void drawInRegion(Collection<? extends SizedDrawable> drawables, Rectangle region) {
-    	if (region==null) return;
-    	
-        Rectangle drawArea = new Rectangle(region.getPos().x+padding, region.getPos().y+padding, region.getWidth()-padding*2, region.getHeight()-padding*2);
-        
+        if (region == null) return;
+
+        Rectangle drawArea = new Rectangle(region.getPos().x + padding, region.getPos().y + padding, region.getWidth() - padding * 2,
+                region.getHeight() - padding * 2);
+
         List<Row> rows = new ArrayList<Row>();
-        rows.add(new Row());        
-        
+        rows.add(new Row());
+
         // Calculate number of rows and row widths
-        for(SizedDrawable d : drawables) {
-            Row row = rows.get(rows.size()-1);
-            row.addItem(d); 
-            
+        for (SizedDrawable d : drawables) {
+            Row row = rows.get(rows.size() - 1);
+            row.addItem(d);
+
             if (row.getWidth() > drawArea.getWidth()) {
                 // Start a new row
                 row.removeItem(d);
                 row = new Row();
                 rows.add(row);
-                row.addItem(d); 
+                row.addItem(d);
             }
         }
-        
-        // Calculate the height we need 
+
+        // Calculate the height we need
         float height = 0;
-        for(Row row : rows) {
+        for (Row row : rows) {
             height += row.getHeight();
         }
 
         // Draw all the rows
         float iy = drawArea.getPos().y;
         if (alignToMiddle && height < drawArea.getHeight()) {
-            iy += (drawArea.getHeight()-height)/2;
+            iy += (drawArea.getHeight() - height) / 2;
         }
-        
+
         // If we are overflowing, try to mitigate it
         float actualYSpacing = ySpacing;
         if (height > drawArea.getHeight()) {
-            actualYSpacing = ySpacing/2;
+            actualYSpacing = ySpacing / 2;
         }
         else if (!alignToMiddle) {
             // Add some extra padding since we've not overflowing
             iy += 2;
         }
-        
-        for(Row row : rows) {
-            float ix = drawArea.getPos().x + (drawArea.getWidth()-row.getWidth())/2;
-            
-            for(SizedDrawable item : row.getItems()) {
+
+        for (Row row : rows) {
+            float ix = drawArea.getPos().x + (drawArea.getWidth() - row.getWidth()) / 2;
+
+            for (SizedDrawable item : row.getItems()) {
                 item.setPos(new PVector(ix, iy));
                 item.draw(buf);
                 ix += item.getSize(buf).getWidth() + xSpacing;
             }
-            
+
             // Move to next row
             iy += row.getHeight() + actualYSpacing;
         }
     }
-    
+
     private class Row {
-        
+
         private Collection<SizedDrawable> items = new ArrayList<SizedDrawable>();
         private float width;
         private float height;
-        
+
         public void addItem(SizedDrawable item) {
             items.add(item);
             Rectangle rect = item.getSize(buf);
@@ -110,13 +111,13 @@ public class FlowLayout {
             width -= rect.getWidth();
             // TODO: This leaves the height alone. Not a big deal right now, because all our items are the same height, but in the future...
         }
-        
+
         public Collection<SizedDrawable> getItems() {
             return items;
         }
 
         public float getWidth() {
-            return width + items.size()*xSpacing;
+            return width + items.size() * xSpacing;
         }
 
         public float getHeight() {
