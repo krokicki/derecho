@@ -835,6 +835,10 @@ public class CubicSketchState implements Runnable {
 
         public void draw(PGraphics buf) {
 
+        	if (pos==null) {
+        		log.warn("Actor {} has no position",name);
+        		return;
+        	}
             buf.pushMatrix();
             buf.stroke(Utils.color("ffffff"), opacity);
             buf.strokeWeight(1);
