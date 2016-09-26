@@ -34,13 +34,17 @@ public class GridState {
 
         this.name = name;
 
-        GridConfig config = GridConfig.getInstance();
-
-        for (SnapshotNode ssNode : snapshot.getNodes()) {
-
-            NodeConfiguration nodeConfig = config.getConfiguration(ssNode.getShortName());
-            int numSlots = nodeConfig.getNodeSet().getSlots();
-
+    	GridConfig config = GridConfig.getInstance();
+    	
+        for(SnapshotNode ssNode : snapshot.getNodes()) {
+        	
+    		NodeConfiguration nodeConfig = config.getConfiguration(ssNode.getShortName());
+    		if (nodeConfig==null) {
+    			log.warn("No configuration for "+ssNode.getShortName());
+    			continue;
+    		}
+    		Integer numSlots = nodeConfig.getNodeSet().getSlots();
+        	
             GridNode node = new GridNode(ssNode.getShortName(), numSlots);
             nodes.add(node);
             for (SnapshotJob ssJob : ssNode.getJobs()) {
