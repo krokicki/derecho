@@ -1,0 +1,3 @@
+Bug Fixes
+---------
+* Correct processing of the ‘exclusive’ hard request flag

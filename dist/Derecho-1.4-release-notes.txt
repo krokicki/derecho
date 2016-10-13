@@ -1,0 +1,6 @@
+Bug Fixes
+---------
+* Fixed processing to correctly ignore unmapped nodes
+* Added mapping for Janelia's e* nodes
+* Fixed null pointer exception in 3d vizualization
+

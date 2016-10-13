@@ -1,0 +1,14 @@
+Changes
+-------
+* Added h09 rack and made the other minor infrastructure adjustments.
+* Added a new automated build process that will allow us to make more frequent/small updates as necessary.
+* Removed “JFRC” branding. Changed view titles to “Janelia Compute Cluster” and “Janelia Legacy Cluster”.
+* Added button for hiding the timeline graph.
+* Added configuration options for font sizes and displaying the timeline graph.
+
+Bug Fixes
+---------
+* MPI jobs (hadoop_exclusive or otherwise) should be handled correctly now.
+* Jobs spanning multiple queues on a single node should be handled correctly now.
+* The view should no longer go out of sync after a while, except in extreme circumstances (e.g. new nodes being added to the grid). 
+* Improved handling of different screen resolutions. 
