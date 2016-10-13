@@ -45,6 +45,7 @@ A node may match multiple node sets, but only the last matching definition in th
     <subset name="Janelia Legacy Cluster">
     
         <nodes pattern="f0*(\d+)u0*(\d+)" slots="8"/>
+        <nodes pattern="e0*(\d+)u0*(\d+)" slots="16"/>
         
     </subset>
 </grid>
