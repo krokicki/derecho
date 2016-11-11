@@ -1,0 +1,4 @@
+Changes
+-------
+* Updated configuration for the new nodes in the Janelia compute cluster
+* Added a property (derecho.viz.draw.slot.aspectratio) for controlling slot size
