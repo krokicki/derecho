@@ -232,6 +232,9 @@ public class SketchState implements Runnable {
     private long nextStartingPosition = 0;
     private int maxGraphValue;
 
+    // Aspect ratio for slots
+    private float slotAspectRatio = ConfigProperties.getFloat("derecho.viz.draw.slot.aspectratio", 1.0f);
+    
     // Draw outlines for UI components?
     private boolean isDrawOutlines = ConfigProperties.getBoolean("derecho.viz.draw.outlines", false);
 
@@ -818,7 +821,9 @@ public class SketchState implements Runnable {
         // Position grid nodes for the current subset
         float gridWidth = width - 2 * padding;
         float nodeWidth = ((gridWidth + nodeSpacing) / (numCols - emptyCols)) - nodeSpacing;
-        this.slotWidth = slotHeight = (nodeWidth - slotSpacing * 5) / 4;
+        this.slotWidth = (nodeWidth - slotSpacing * 5) / 4;
+        slotHeight = slotWidth * slotAspectRatio;
+        log.info("slotSize={}x{}", slotWidth, slotHeight);
         float gridHeight = 0;
 
         for (int j = emptyRows; j < numRows; j++) {

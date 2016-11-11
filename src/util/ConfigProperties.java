@@ -85,6 +85,12 @@ public class ConfigProperties extends Properties {
         if (isEmpty(s)) return defaultValue;
         return Long.valueOf(s);
     }
+    
+    public static Float getFloat(String name, Float defaultValue) {
+        String s = getInstance().getProperty(name);
+        if (isEmpty(s)) return defaultValue;
+        return Float.valueOf(s);
+    }
 
     private static boolean isEmpty(String s) {
         return s == null || s.trim().equals("");
