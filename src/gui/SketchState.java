@@ -90,12 +90,15 @@ public class SketchState implements Runnable {
         public int nodeBorderColor;
         public int nodeBackgroundColor;
         public int emptySlotColor;
+        public int nodeFontColor;
+        public int titleFontColor;
+        public int highlightNodeBorderColor;
+        public int highlightEmptySlotColor;
+        public int highlightNodeFontColor;
         public int timelineColor;
         public int panelBorderColor;
         public int graphLineColorRunningJobs;
         public int graphLineColorQueuedJobs;
-        public int nodeFontColor;
-        public int titleFontColor;
     }
 
     public class DefaultColorScheme extends ColorScheme {
@@ -105,12 +108,15 @@ public class SketchState implements Runnable {
             this.nodeBorderColor = gridBaseColor;
             this.nodeBackgroundColor = gridBackgroundColor;
             this.emptySlotColor = Utils.color("323966");
+            this.nodeFontColor = gridBaseColor;
+            this.titleFontColor = gridBaseColor;
+            this.highlightNodeBorderColor = Utils.color("A46AB2");
+            this.highlightEmptySlotColor = Utils.color("423066");
+            this.highlightNodeFontColor = Utils.color("A46AB2");
             this.timelineColor = Utils.color("323966");
             this.panelBorderColor = Utils.color("2C3259");
             this.graphLineColorRunningJobs = Utils.color("7E90FF");
             this.graphLineColorQueuedJobs = Utils.color("FFEC7E");
-            this.nodeFontColor = gridBaseColor;
-            this.titleFontColor = gridBaseColor;
         }
     }
 
@@ -121,12 +127,15 @@ public class SketchState implements Runnable {
             this.nodeBorderColor = gridBaseColor;
             this.nodeBackgroundColor = Utils.color("000000");
             this.emptySlotColor = Utils.color("4D4D4D");
+            this.nodeFontColor = gridBaseColor;
+            this.titleFontColor = gridBaseColor;
+            this.highlightNodeBorderColor = nodeBorderColor;
+            this.highlightEmptySlotColor = emptySlotColor;
+            this.highlightNodeFontColor = nodeFontColor;
             this.timelineColor = Utils.color("292929");
             this.panelBorderColor = gridBaseColor;
             this.graphLineColorRunningJobs = Utils.color("CCCCCC");
             this.graphLineColorQueuedJobs = Utils.color("A8A8A8");
-            this.nodeFontColor = gridBaseColor;
-            this.titleFontColor = gridBaseColor;
         }
     }
 
@@ -822,8 +831,9 @@ public class SketchState implements Runnable {
         float gridWidth = width - 2 * padding;
         float nodeWidth = ((gridWidth + nodeSpacing) / (numCols - emptyCols)) - nodeSpacing;
         this.slotWidth = (nodeWidth - slotSpacing * 5) / 4;
+        if (slotWidth>20) slotWidth = 20;
         slotHeight = slotWidth * slotAspectRatio;
-        log.info("slotSize={}x{}", slotWidth, slotHeight);
+        log.trace("slotSize: {} x {}", slotWidth, slotHeight);
         float gridHeight = 0;
 
         for (int j = emptyRows; j < numRows; j++) {
@@ -1575,6 +1585,10 @@ public class SketchState implements Runnable {
             }
         }
 
+        public GridNode getNode() {
+            return node;
+        }
+
         public void setPos(PVector pos) {
             super.setPos(pos);
             if (slots == null) return;
@@ -1594,16 +1608,30 @@ public class SketchState implements Runnable {
             if (rect == null) return;
 
             buf.strokeWeight(1);
-            Utils.fill(buf, colorScheme.nodeBackgroundColor, opacity);
-            Utils.stroke(buf, colorScheme.nodeBorderColor, opacity);
 
+            Utils.fill(buf, colorScheme.nodeBackgroundColor, opacity);
+            
+            if ("sge".equalsIgnoreCase(node.getQtype())) {
+                // Special case for LSF changeover
+                Utils.stroke(buf, colorScheme.highlightNodeBorderColor, opacity);
+            }
+            else {
+                Utils.stroke(buf, colorScheme.nodeBorderColor, opacity);
+            }
+            
             buf.rect(pos.x, pos.y, rect.getWidth(), rect.getHeight());
 
             for (int s = 0; s < slots.length; s++) {
                 slots[s].draw(buf);
             }
 
-            Utils.fill(buf, colorScheme.nodeFontColor, opacity);
+            if ("sge".equalsIgnoreCase(node.getQtype())) {
+                // Special case for LSF changeover
+                Utils.fill(buf, colorScheme.highlightNodeFontColor, opacity);
+            }
+            else {
+                Utils.fill(buf, colorScheme.nodeFontColor, opacity);
+            }
 
             buf.textFont(nodeFont);
             buf.textAlign(PApplet.CENTER, PApplet.CENTER);
@@ -1660,8 +1688,18 @@ public class SketchState implements Runnable {
                 buf.colorMode(PApplet.RGB);
             }
             else {
-                Utils.stroke(buf, colorScheme.emptySlotColor, opacity);
-                Utils.fill(buf, colorScheme.emptySlotColor, opacity);
+             
+                // Special case for LSF changeover
+                // TODO: eliminate this later
+                if ("sge".equalsIgnoreCase(nodeSprite.getNode().getQtype())) {
+                    Utils.fill(buf, colorScheme.highlightEmptySlotColor, opacity); // Was 323966
+                    Utils.stroke(buf, colorScheme.highlightEmptySlotColor, opacity);
+                }
+                else {
+                    Utils.fill(buf, colorScheme.emptySlotColor, opacity);
+                    Utils.stroke(buf, colorScheme.emptySlotColor, opacity);
+                }
+                
             }
             buf.strokeWeight(1);
             buf.rect(pos.x, pos.y, slotWidth, slotHeight);

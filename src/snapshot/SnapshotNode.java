@@ -11,6 +11,7 @@ import java.util.List;
 public class SnapshotNode {
 
     private String name;
+    private String qtype;
     private List<SnapshotJob> jobs = new ArrayList<SnapshotJob>();
 
     public String getName() {
@@ -19,6 +20,14 @@ public class SnapshotNode {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getQtype() {
+        return qtype;
+    }
+
+    public void setQtype(String qtype) {
+        this.qtype = qtype;
     }
 
     public void addJob(SnapshotJob job) {
@@ -35,6 +44,6 @@ public class SnapshotNode {
 
     @Override
     public String toString() {
-        return "SnapshotNode [name=" + name + ", numJobs=" + jobs.size() + "]";
+        return "SnapshotNode [name=" + name + ", qtype=" + qtype + ",  numJobs=" + jobs.size() + "]";
     }
 }

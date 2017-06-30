@@ -48,6 +48,7 @@ public class MySQLBasedStateLoader extends StateLoader {
         log.info("Loading {} initial hours", initialHours);
         return loadInitial(
                 "select distinct poll_date_time from webqstat_node where poll_date_time >= convert_tz(now(), @@global.time_zone, 'US/Eastern') - INTERVAL "
+//                "select distinct poll_date_time from webqstat_node where poll_date_time >= now() - INTERVAL "
                         + initialHours + " HOUR order by poll_date_time");
         // return loadInitial("select distinct poll_date_time from webqstat_node where poll_date_time between '2013/05/07 13:00:00' and '2013/05/07
         // 13:30:00' order by poll_date_time"); // new grid
@@ -94,7 +95,7 @@ public class MySQLBasedStateLoader extends StateLoader {
                 }
             }
 
-            log.debug("Loaded {} snapshots", timeline.getSnapshots().size());
+            log.info("Loaded {} initial snapshots", timeline.getSnapshots().size());
         }
         finally {
             if (rs != null) rs.close();
@@ -175,7 +176,7 @@ public class MySQLBasedStateLoader extends StateLoader {
             conn = getJdbcConnection();
 
             StringBuffer sql = new StringBuffer();
-            sql.append("select id,name from webqstat_node where poll_date_time = ?");
+            sql.append("select id,name,qtype from webqstat_node where poll_date_time = ?");
             stmt = conn.prepareStatement(sql.toString(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
             stmt.setFetchSize(Integer.MIN_VALUE);
             stmt.setTimestamp(1, snapshotDate);
@@ -185,10 +186,12 @@ public class MySQLBasedStateLoader extends StateLoader {
             while (rs.next()) {
                 Integer nodeId = (Integer) rs.getObject(1);
                 String queueName = rs.getString(2);
+                String qtype = rs.getString(3);
                 String hostname = queueName.substring(queueName.indexOf('@') + 1);
                 if (!nodeNameMap.containsKey(hostname)) {
                     SnapshotNode node = new SnapshotNode();
                     node.setName(hostname);
+                    node.setQtype(qtype);
                     snapshot.addNode(node);
                     nodeNameMap.put(hostname, node);
                 }

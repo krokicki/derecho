@@ -18,15 +18,21 @@ public class GridNode {
     private static final Logger log = LoggerFactory.getLogger(GridNode.class);
 
     private final String shortName;
+    private final String qtype;
     private final GridJob[] slots;
 
-    public GridNode(String shortName, int numSlots) {
+    public GridNode(String shortName, String qtype, int numSlots) {
         this.shortName = shortName;
+        this.qtype = qtype;
         this.slots = new GridJob[numSlots];
     }
 
     public String getShortName() {
         return shortName;
+    }
+
+    public String getQtype() {
+        return qtype;
     }
 
     public List<Integer> assignJobToSlots(GridJob job) {
@@ -100,6 +106,6 @@ public class GridNode {
                 slotStr.append(slots[i].getFullJobId());
             }
         }
-        return "GridNode [name=" + shortName + ", (" + slotStr + ")]";
+        return "GridNode [name=" + shortName + ", qtype=" + qtype + ", (" + slotStr + ")]";
     }
 }

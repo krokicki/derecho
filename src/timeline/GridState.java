@@ -45,7 +45,7 @@ public class GridState {
     		}
     		Integer numSlots = nodeConfig.getNodeSet().getSlots();
         	
-            GridNode node = new GridNode(ssNode.getShortName(), numSlots);
+            GridNode node = new GridNode(ssNode.getShortName(), ssNode.getQtype(), numSlots);
             nodes.add(node);
             for (SnapshotJob ssJob : ssNode.getJobs()) {
                 GridJob job = new GridJob(ssJob);

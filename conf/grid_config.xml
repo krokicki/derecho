@@ -14,22 +14,16 @@ A node may match multiple node sets, but only the last matching definition in th
     <subset name="Janelia Compute Cluster">
         
         <nodes pattern="h(\d+)u(\d+)" slots="16"/>
-        
         <nodes pattern="h09u(\d+)" slots="32" row="9"/>
         <nodes pattern="h10u(\d+)" slots="32" row="10"/>
         <nodes pattern="h11u(\d+)" slots="32" row="11"/>
         
-        
     </subset>
-    <subset name="Janelia Legacy Cluster">
+    <subset name="Janelia Test Cluster">
     
-        <nodes pattern="f0*(\d+)u0*(\d+)" slots="8"/>
+        <nodes pattern="f0*(\d+)u0*(\d+)" slots="16"/>
         <nodes pattern="e0*(\d+)u0*(\d+)" slots="16"/>
-        <nodes pattern="f15u27" slots="16" row="10" col="12"/>
-        <nodes pattern="f16u33" slots="16" row="10" col="22"/>
-        <nodes pattern="f16u35" slots="16" row="10" col="23"/>
         
-
     </subset>
 </grid>
 
