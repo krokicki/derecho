@@ -1,0 +1,6 @@
+Changes
+-------
+* Updated configuration to support the hybrid LSF/SGE cluster during transition
+* Support for using node's "qtype" attribute to indicate cluster affinity
+* Special coloring for remaining SGE nodes
+
